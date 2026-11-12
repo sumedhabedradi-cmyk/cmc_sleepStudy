@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <!-- Meta, title, CSS, favicons, etc. -->
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--<link rel="icon" href="images/favicon.ico" type="image/ico" />-->
+  <link rel="icon" href="images/svasthyaicon2.ico" type="image/ico" />
+
+  <title>Svasthya | Live and History</title>
+  <script type="module" src="../build/js/firebase/config.js"></script>
+
+  <script type="module" src="../build/js/videoCall/index.js"></script>
+  <script type="module" src="../build/js/livepage/database_function.js"></script>
+  <script type="module" src="../build/js/LeftandTopNavigation/LeftandTopNavigation.js"></script>
+  <!-- Bootstrap -->
+  <link href="../vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Font Awesome -->
+  <link href="../vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../build/js/videoCall/index.css" />
+  <!-- NProgress -->
+  <link href="../vendors/nprogress/nprogress.css" rel="stylesheet" />
+  <!-- iCheck -->
+  <link href="../vendors/iCheck/skins/flat/green.css" rel="stylesheet" />
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" />
+  <!-- bootstrap-progressbar -->
+  <link href="../vendors/bootstrap-progressbar/css/bootstrap-progressbar-3.3.4.min.css" rel="stylesheet" />
+  <!-- JQVMap -->
+  <link href="../vendors/jqvmap/dist/jqvmap.min.css" rel="stylesheet" />
+  <!-- bootstrap-daterangepicker -->
+  <link href="../vendors/bootstrap-daterangepicker/daterangepicker.css" rel="stylesheet" />
+
+
+  <!-- <link href="../build/css/custom.min.css" rel="stylesheet"> -->
+  <link href="../build/css/LeftandTopNavigation.css" rel="stylesheet" />
+  <link href="../build/css/LiveRightColomn.css" rel="stylesheet" />
+  <link href="../build/css/vital.css" rel="stylesheet" />
+  <script src="https://cdn.firebase.com/js/client/2.2.1/firebase.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-messaging.js"></script>
+  <script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+
+<body class="nav-md">
+  <div class="container body">
+    <div class="main_container">
+      <div class="left_col scroll-view">
+        <div class="nav_title">
+          <a onclick="dashboardclick()" class="site_title"><img src="images/svasthyaicon.png" width="55" height="55" />
+            <span id="SvasthyaTitle">SVASTHYA &trade;</th></a>
+        </div>
+
+        <!-- menu profile quick info -->
+        <div id="left_colomn_details" class="left_colomn_details">
+          <div class="profile clearfix">
+            <div class="profile_pic">
+              <img id="PatientImg" alt="..." class="img-circle profile_img" />
+            </div>
+            <div id="profile_info" class="profile_info">
+              <h2 id="PatientName"></h2>
+              <h2 id="PatientGender"></h2>
+              <h2 id="PatientAge"></h2>
+              <!-- <h2 id="CompletedSession"></h2>
+                <h2 id="Duration"></h2> -->
+            </div>
+            <div class="profile_info2">
+              <h2 id="CompletedSession"></h2>
+              <h2 id="Duration"></h2>
+              <h2>Completed Session Summary</h2>
+              <div>
+                <ul id="SessionsList"></ul>
+              </div>
+              <!-- <h2 id="PatientEmail"></h2>  -->
+
+
+
+            </div>
+          </div>
+        </div>
+        <br />
+        <!-- 
+          <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+            <div class="menu_section">
+              <ul class="nav side-menu">
+                <li>
+                  <a id="sidebarToggle" class="tablink" title="Toggle Sidebar"><i class="fa fa-bars"></i>&nbsp; </a>
+                </li>
+                <li>
+                  <a class="tablink" id="defaultOpen" title="Session Details"><i class="fa fa-desktop"></i><span class="menu-text">&nbsp; Session Details</th></a>
+                </li>
+                <li>
+                  <a class="tablink" id="openhistory" title="Vital plots"><i class="fa fa-bar-chart-o"></i><span class="menu-text">&nbsp; Vital plots</th></a>
+                </li>
+                <li>
+                  <a class="tablink" id="openoxy" title="Oxygenation Parameters"><i class="fa fa-heart"></i><span class="menu-text">&nbsp; Oxygenation Parameters</th></a>
+                </li>
+                 <li>
+                  <a class="tablink" id="openhr" title="Heart Rate and Respiration Rate Parameters"><i class="fa fa-heart"></i><span class="menu-text">&nbsp; Heart Rate and Respiration Rate Parameters</th></a>
+                </li>
+              </ul>
+            </div>
+          </div> -->
+      </div>
+      <div id="loaderOverlay" class="loader-overlay">
+        <div class="loader"></div>
+      </div>
+
+      <!-- top navigation -->
+      <div class="top_nav">
+        <div class="nav_menu">
+          <div class="Righthand">
+            <span id="battery-percentage" style="color: white"></th>&nbsp; &nbsp;
+              <a onclick="dashboardclick()"><i class="fa fa-home"></i> Dashboard &nbsp;</a>
+              <span><a id="logout"><i class="fa fa-power-off"></i> Logout</a></th>
+          </div>
+          <script>
+            function dashboardclick() {
+              localStorage.removeItem("patient_unique_id");
+              location.replace("dashboard.html");
+            }
+          </script>
+          <div class="Lefthand"></div>
+               
+        </div>
+      </div>
+    </div>
+  <!-- Restore default Report toggle-->
+<div class="restore-bar">
+  <div class="trim-mode-wrap restore-wrap">
+    <label for="defaultResetBtn" title="Reset to default (remove all trims)">Restore Default Report</label>
+    <label class="trim-switch">
+      <input type="checkbox" id="defaultResetBtn">
+      <span class="trim-switch__slider"></span>
+    </label>
+  </div>
+</div>
+    <div id="SessionDetails" class="right_col" role="main">
+      <div class="col-md-12 col-sm-12 col-xs-12 Graphcard">
+        <!-- <div class="x_panel"> -->
+        <div class="vitals-hero">
+          <div class="vitals-hero__heading">
+            <p class="vitals-hero__eyebrow">Session Details </p>
+          </div>
+        </div>
+        <div class="card">
+       <table class="report-table">
+        <tbody>
+          <tr>
+            <th>Session Date</th>
+            <td id="sessiondate"></td>
+          </tr>
+          <tr>
+            <th>Report Generation Date &amp; Time</th>
+            <td id="rptdatetime"></td>
+          </tr>
+          <tr>
+            <th>Session Start Time</th>
+            <td id="sessionstarttime"></td>
+          </tr>
+          <tr>
+            <th>Session End Time</th>
+            <td id="sessionendtime"></td>
+          </tr>
+          <tr>
+            <th>SPO₂ Sampling / Averaging Time</th>
+            <td id="samplingtime"></td>
+          </tr>
+          <tr>
+            <th>Total Recording Time</th>
+            <td id="totalrectime"></td>
+          </tr>
+          <tr>
+            <th>Artifact Free Interpretable Time</th>
+            <td id="afit"></td>
+          </tr>
+          <tr>
+            <th>Signal Quality</th>
+            <td id="signal_quality"></td>
+          </tr>
+          <tr>
+            <th>Study Adequacy</th>
+            <td id="studyadequacy"></td>
+          </tr>
+        </tbody>
+      </table>
+        </div>
+        <!-- </div>
+        <div></div>
+    </div> -->
+       
+      
+      
+
+         <div class="vitals-hero">
+          <div class="vitals-hero__heading">
+            <p class="vitals-hero__eyebrow">Vital Plots </p>
+          </div>
+        </div>
+
+        
+        <!-- <div class="card-graph"> -->
+           <section class="live-chart-column" aria-label="Live waveform charts">
+            <div class="trim-mode-wrap" id="globalTrimWrap">
+
+  <label>Automatic Trim</label>
+  <label class="trim-switch">
+    <input type="checkbox" id="trimModeGlobal" data-mode="">
+    <span class="trim-switch__slider"></span>
+  </label>
+
+ <!-- <button id="manualTrimBtn">
+    Manual Trim
+</button> -->
+<!-- Hard reset -->
+  <!-- <button type="button" id="trimResetBtn" class="trim-reset-btn" title="Reset trim">
+    <i class="fa fa-undo"></i> Reset
+  </button> -->
+
+</div>
+            <div id="timeTabs"></div>
+            <!-- Trim -->
+              <!-- <div class="trim-mode-wrap" id="globalTrimWrap">
+  <label for="trimModeGlobal">Trim:</label>
+  <select id="trimModeGlobal" class="trim-mode-select">
+    <option value="">Select</option>
+    <option value="automatic">Automatic</option>
+    <option value="manual">Manual</option>
+  </select>
+</div> -->
+
+                <!-- <article class="live-wave-card">
+                  
+                  <div class="live-wave-card__header">
+                    
+                    <div>
+                      <h2>Heart Rate (HR)</h2>
+                    </div>
+                    
+                  </div>
+                  <div class="x_panel live-chart-panel">
+                    <div id="heart_rate_echart_content"></div>
+                  </div>
+                  <div class="chart-nav">
+                      <button id="backBtnhr" class="nav-btn">◀ Back</button>
+                      <button id="nextBtnhr" class="nav-btn">Next ▶</button>
+                  </div>
+                </article> -->
+                <article class="live-wave-card">
+  <div class="live-wave-card__header">
+    <div>
+      <h2>Heart Rate (HR)</h2>
+    </div>
+  </div>
+  <div class="x_panel live-chart-panel">
+    <div id="heart_rate_echart_content"></div>
+  </div>
+  <div class="chart-nav">
+      <button id="backBtnhr" class="nav-btn">◀ Back</button>
+      <button id="nextBtnhr" class="nav-btn">Next ▶</button>
+  </div>
+</article>
+                
+                <article class="live-wave-card">
+                  <div class="live-wave-card__header">
+                    <div>
+                      <h2>Blood Oxygen (SPO2)</h2>
+                    </div>  
+                  </div>
+                  <div class="x_panel live-chart-panel">
+                    <div id="spo2_echart_content"></div>
+                  </div>
+                  <div class="chart-nav">
+                      <button id="backBtnspo2" class="nav-btn">◀ Back</button>
+                      <button id="nextBtnspo2" class="nav-btn">Next ▶</button>
+                  </div>
+                </article>
+
+                <!-- <article class="live-wave-card"> -->
+                  <article class="live-wave-card" id="ciCard">
+                  <div class="live-wave-card__header">
+                    <div>
+                      <h2>Chest Impedance </h2>
+                    </div>
+                  </div>
+                  <div class="x_panel live-chart-panel">
+                    <div id="respiration_rate_echart_content"></div>
+                  </div>
+                  <div class="chart-nav">
+                      <button id="backBtnci" class="nav-btn">◀ Back</button>
+                      <button id="nextBtnci" class="nav-btn">Next ▶</button>
+                  </div>
+                </article>
+
+                 <article class="live-wave-card">
+                  <div class="live-wave-card__header">
+                    <div>
+                      <h2>Respiration Rate </h2>
+                    </div>
+                  </div>
+                  <div class="x_panel live-chart-panel">
+                    <div id="resp_rate_echart_content"></div>
+                  </div>
+                  <div class="chart-nav">
+                      <button id="backBtnrr" class="nav-btn">◀ Back</button>
+                      <button id="nextBtnrr" class="nav-btn">Next ▶</button>
+                  </div>
+                </article>
+              </section>
+       
+        
+
+        <!-- <div id = "OxygenationParameters" class = "right_col" role = "main"> -->
+        <!-- <div class="col-md-12 col-sm-12 col-xs-12 Graphcard"> -->
+        <div class="vitals-hero">
+          <div class="vitals-hero__heading">
+            <p class="vitals-hero__eyebrow">Oxygenation Parameters </p>
+          </div>
+        </div>
+        
+        <div class="card">
+          <table class="report-table">
+         <tbody>
+          <tr>
+            <th>Mean SpO2 : </th>
+            <td id="meanspo2"></td>
+          </tr>
+          <tr>
+            <th>Baseline SpO2 :</th>
+            <td id="baselinespo2"></td>
+          </tr>
+          <tr>
+            <th>Minimum SpO2 (Nadir) :</th>
+            <td id="minspo2"></td>
+          </tr>
+          <tr>
+            <th>Maximum SpO2 :</th>
+            <td id="maxspo2"></td>
+          </tr>
+          <tr>
+            <th>ODI3 — Total events :</th>
+            <td id="odi3-total"></td>
+          </tr>
+          <tr>
+            <th>ODI3 — Events per hour :</th>
+            <td id="odi3-events"></td>
+          </tr>
+         <tr>
+            <th>ODI4 — Total events :</th>
+            <td id="odi4-total"></td>
+          </tr>
+         <tr>
+            <th>ODI4 — Events per hour :</th>
+            <td id="odi4-events"></td>
+         </tr>
+          <!-- <tr>
+            <th>Total desaturation events :</th>
+            <td id="totaldesatevents"></td>
+          </tr> -->
+
+          <tr>
+            <th>Time below 95% (Time & Percentage) :</th>
+            <td id="timebelow95"></td>
+          </tr>
+          <tr>
+            <th>Time below 90% (Time & Percentage) :</th>
+            <td id="timebelow90"></td>
+          </tr>
+          <tr>
+            <th>Time below 85% (Time & Percentage) :</th>
+            <td id="timebelow85"></td>
+          </tr>
+          <tr>
+            <th>Time below 80% (Time & Percentage) :</th>
+            <td id="timebelow80"></td>
+          </tr>
+         <tr>
+            <th>Time below 70% (Time & Percentage) :</th>
+            <td id="timebelow70"></td>
+          </tr>
+
+          <tr>
+            <th>Time below 60% (Time & Percentage) :</th>
+            <td id="timebelow60"></td>
+          </tr>
+         <tr>
+            <th>Time between 90% - 95% (Time & Percentage) :</th>
+            <td id="timebetween90"></td>
+          </tr>
+         <tr>
+            <th>Time between 80% - 90% (Time & Percentage) :</th>
+            <td id="timebetween80"></td>
+          </tr>
+          <tr>
+            <th>Time between 70% - 80% (Time & Percentage) :</th>
+            <td id="timebetween70"></td>
+          </tr>
+          <tr>
+            <th>Time between 60% - 70% (Time & Percentage) :</th>
+            <td id="timebetween60"></td>
+          </tr>
+          <tr>
+            <th>Longest continuous run SpO2 < 94% :</th>
+                <td id="lcrspo294"></td>
+          </tr>
+          <tr>
+            <th>Longest continuous run SpO2 < 90% :</th>
+                <td id="lcrspo290"></td>
+          </tr>
+          <tr>
+            <th>Longest continuous run SpO2 < 80% :</th>
+                <td id="lcrspo280"></td>
+          </tr>
+
+  </tbody>
+  </table>
+
+          <!-- </div> -->
+        </div>
+        
+       
+
+        <!-- </div> -->
+        <!-- <div id="HistoryComponents" class="right_col" role="main">  -->
+       
+
+
+        <div class="vitals-hero">
+          <div class="vitals-hero__heading">
+            <p class="vitals-hero__eyebrow">Heart Rate & Respiration Rate parameters </p>
+          </div>
+        </div>
+        <div class="card">
+            <table class="report-table">
+           <tbody>
+        
+          <tr>
+            <th>Baseline HR (first 2 min / first stable segment) : </th>
+            <td id="baselinehr"></td>
+          </tr>
+          <tr>
+            <th>Mean HR (Full Session) :</th>
+            <td id="meanhr"></td>
+          </tr>
+          <tr>
+            <th>Lowest HR :</th>
+            <td id="lowhr"></td>
+            </tr>
+          <tr>
+            <th>Highest HR :</th>
+            <td id="highhr"></td>
+          </tr>
+          <tr>
+            <th>BaseLine RR :</th>
+            <td id="baselinerr"></td>
+          </tr>
+          <tr>
+            <th>Mean RR(Full Session) :</th>
+            <td id="meanrr"></td>
+            </tr>
+          <tr>
+            <th>Lowest RR :</th>
+            <td id="lowrr"></td>
+          </tr>
+          <tr>
+            <th>Highest RR :</th>
+            <td id="highrr"></td>
+            </tr>
+
+
+
+          <!-- </div> -->
+
+           </tbody>
+            </table>
+
+</div>
+</div>
+
+
+
+
+      <link href="../build/css/HistoryRightColomn.css" rel="stylesheet" />
+
+      <!-- jQuery -->
+      <script src="../vendors/jquery/dist/jquery.min.js"></script>
+      <!-- Bootstrap -->
+      <script src="../vendors/bootstrap/dist/js/bootstrap.min.js"></script>
+      <!-- FastClick -->
+      <script src="../vendors/fastclick/lib/fastclick.js"></script>
+      <!-- NProgress -->
+      <script src="../vendors/nprogress/nprogress.js"></script>
+      <!-- Chart.js -->
+      <script src="../vendors/Chart.js/dist/Chart.min.js"></script>
+      <!-- gauge.js -->
+      <script src="../vendors/gauge.js/dist/gauge.min.js"></script>
+      <!-- bootstrap-progressbar -->
+      <script src="../vendors/bootstrap-progressbar/bootstrap-progressbar.min.js"></script>
+      <!-- iCheck -->
+      <script src="../vendors/iCheck/icheck.min.js"></script>
+      <!-- Skycons -->
+      <script src="../vendors/skycons/skycons.js"></script>
+      <!-- Flot -->
+      <script src="../vendors/Flot/jquery.flot.js"></script>
+      <script src="../vendors/Flot/jquery.flot.pie.js"></script>
+      <script src="../vendors/Flot/jquery.flot.time.js"></script>
+      <script src="../vendors/Flot/jquery.flot.stack.js"></script>
+      <script src="../vendors/Flot/jquery.flot.resize.js"></script>
+      <!-- Flot plugins -->
+      <script src="../vendors/flot.orderbars/js/jquery.flot.orderBars.js"></script>
+      <script src="../vendors/flot-spline/js/jquery.flot.spline.min.js"></script>
+      <script src="../vendors/flot.curvedlines/curvedLines.js"></script>
+      <!-- DateJS -->
+      <script src="../vendors/DateJS/build/date.js"></script>
+      <!-- JQVMap -->
+      <script src="../vendors/jqvmap/dist/jquery.vmap.js"></script>
+      <!-- <script src="../vendors/jqvmap/dist/maps/jquery.vmap.world.js"></script> -->
+      <script src="../vendors/jqvmap/examples/js/jquery.vmap.sampledata.js"></script>
+      <!-- bootstrap-daterangepicker -->
+      <script src="../vendors/moment/min/moment.min.js"></script>
+      <script src="../vendors/bootstrap-daterangepicker/daterangepicker.js"></script>
+      <script src="../vendors/echarts/dist/echarts.min.js"></script>
+      <!-- <script src="../vendors/echarts/map/js/world.js"></script> -->
+      <script src="../vendors/jquery-sparkline/dist/jquery.sparkline.min.js"></script>
+
+      <!-- Custom Theme Scripts -->
+
+      <!-- <script type="module" src="../build/js/videoCall/AgoraRTC_N-4.16.0.js"></script>-->
+
+      <!-- <script src="../build/js/videoCall/AgoraRTC_N-4.16.0.js"></script> -->
+      <!-- easy-pie-chart -->
+      <script src="../vendors/jquery.easy-pie-chart/dist/jquery.easypiechart.min.js"></script>
+
+      <script>
+        // Show the Vitals section by default
+        // console.log("Window Inner Width:", window.innerWidth);
+        // console.log("Window Inner Height:", window.innerHeight);
+
+
+      </script>
+
+      <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+      <div class="version-badge">Version 0.7.5</div>
+</body>
+<script>
+  (function () {
+    const body = document.body;
+    const stored = localStorage.getItem("sidebarCollapsed") === "1";
+    if (stored) {
+      body.classList.remove("nav-md");
+      body.classList.add("nav-sm");
+    }
+
+    // Ensure charts reflow after restoring sidebar state.
+    try {
+      window.dispatchEvent(new Event("sidebar:toggled"));
+      window.dispatchEvent(new Event("resize"));
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 250);
+    } catch {
+      // ignore
+    }
+
+    const btn = document.getElementById("sidebarToggle");
+    btn?.addEventListener("click", () => {
+      const collapsed = body.classList.contains("nav-sm");
+      if (collapsed) {
+        body.classList.remove("nav-sm");
+        body.classList.add("nav-md");
+        localStorage.setItem("sidebarCollapsed", "0");
+      } else {
+        body.classList.remove("nav-md");
+        body.classList.add("nav-sm");
+        localStorage.setItem("sidebarCollapsed", "1");
+      }
+
+      // Notify chart resize handlers (ECharts, etc).
+      try {
+        window.dispatchEvent(new Event("sidebar:toggled"));
+        window.dispatchEvent(new Event("resize"));
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 150);
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 350);
+      } catch {
+        // ignore
+      }
+    });
+  })();
+</script>
+
+</html>
