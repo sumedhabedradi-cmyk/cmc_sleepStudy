@@ -46,19 +46,6 @@ let effectiveTrimMap = null;
 window.getEffectiveTrimMap = () => effectiveTrimMap;
 
 // manual trim 
-// function rebuildEffectiveTrimMap() {
-    
-//     const gaps = [];
-//     if (isTrimEnabled && trimMap) {
-//         gaps.push(...trimMap.gaps);
-//     }
-//     if (manualTrimGaps.length) {
-//         gaps.push(...manualTrimGaps);
-//     }
-//     effectiveTrimMap = gaps.length ? buildTrimMap(gaps) : null;
-// }
-
-
 let savedAutoGaps = null;   // auto-trim gaps loaded from an svdby file
 
 function rebuildEffectiveTrimMap() {
@@ -114,20 +101,8 @@ function setFileHandlers({ save, list, load, paint }) {
     saveFileHandler = save; listFilesHandler = list; loadFileHandler = load; paintSavedHandler = paint;
 }
 
-// ---------- unsaved-changes state ----------
-// let hasUnsaved = false;
-// function setDirty(v) {
-//     hasUnsaved = !!v;
-//     document.getElementById("saveFileBtn")?.classList.toggle("has-changes", hasUnsaved);
-// }
-// ---------- unsaved-changes state (derived from the real trim state) ----------
 let cleanSig = "";
-// function trimSig() {
-//     return JSON.stringify({
-//         auto: !!(isTrimEnabled && trimMap && trimMap.gaps.length),
-//         manual: mergeGaps(manualTrimGaps).map(g => [g.start, g.end])
-//     });
-// }
+let baselineSet = false;          // no baseline yet -> never "dirty"
 
 function trimSig() {
     const auto = isTrimEnabled ? (savedAutoGaps || (trimMap && trimMap.gaps) || []) : [];
@@ -136,32 +111,24 @@ function trimSig() {
         manual: mergeGaps(manualTrimGaps).map(g => [g.start, g.end])
     });
 }
+const isDirty = () => baselineSet && trimSig() !== cleanSig;
 
-const isDirty = () => trimSig() !== cleanSig;
-// function refreshSaveBtn() {
-//     document.getElementById("saveFileBtn")?.classList.toggle("has-changes", isDirty());
-// }
-// function refreshSaveBtn() {
-//     const btn = document.getElementById("saveFileBtn");
-//     if (!btn) return;
-//     btn.disabled = !hasAnyTrim();
-//     btn.classList.toggle("has-changes", isDirty());
-// }
 function refreshSaveBtn() {
     const btn = document.getElementById("saveFileBtn");
     if (!btn) return;
-    const onSavedFile = (document.getElementById("filesDropdown")?.value ?? "raw") !== "raw";
-    // saved file: enabled only after a change; Raw: enabled when any trim exists
-    btn.disabled = onSavedFile ? !isDirty() : !hasAnyTrim();
-    btn.classList.toggle("has-changes", isDirty());
+    const onRaw = (document.getElementById("filesDropdown")?.value ?? "raw") === "raw";
+    // Raw: any trim is unsaved work. Saved file: only after a change.
+    const canSave = onRaw ? hasAnyTrim() : isDirty();
+    btn.disabled = !canSave;
+    btn.classList.toggle("has-changes", canSave);
 }
-// setDirty(false) = "current state is the clean baseline". setDirty(true) is now a no-op refresh.
+
 function setDirty(v) {
-    if (!v) cleanSig = trimSig();
+    if (!v) { cleanSig = trimSig(); baselineSet = true; }
     refreshSaveBtn();
 }
 
-// generic modal: confirm (true/false) or text input (string/null)
+// generic modal: confirm (true/false)
 function showModal({ message, input = false, yesText = "Yes", noText = "No" }) {
     return new Promise(resolve => {
         const ov = document.createElement("div");
@@ -222,42 +189,6 @@ document.addEventListener("click", async e => {
     e.stopImmediatePropagation();
     if (await guardUnsaved()) a.click();      // Yes -> go, No -> stay
 }, true);
-
-// intercept Dashboard / Logout / site title
-// document.addEventListener("click", async e => {
-//     if (!hasUnsaved || !e.isTrusted) return;
-//     const a = e.target.closest("a");
-//     if (!a || !a.closest(".top_nav, .left_col")) return;
-//     e.preventDefault();
-//     e.stopImmediatePropagation();
-//     if (await guardUnsaved()) a.click();
-// }, true);
-// const NAV_SELECTOR =
-//     ".top_nav a, .top_nav button, .top_nav [onclick], " +
-//     ".left_col a, .left_col [onclick], #logout";
-
-// // DEBUG (remove after testing)
-// document.addEventListener("click", async e => {
-//     if (!e.isTrusted) return;
-//     const a = e.target.closest("a");
-//     if (!a || !a.closest(".top_nav, .left_col")) return;
-//     console.log("NAV CLICK, dirty =", isDirty());     // remove after testing
-//     if (!isDirty()) return;
-//     e.preventDefault();
-//     e.stopImmediatePropagation();
-//     if (await guardUnsaved()) a.click();
-// }, true);
-// //
-
-// document.addEventListener("click", async e => {
-//     if (!hasUnsaved || !e.isTrusted) return;
-//     const el = e.target.closest(NAV_SELECTOR);
-//     if (!el || el.closest("#sidebarToggle")) return;
-
-//     e.preventDefault();
-//     e.stopImmediatePropagation();
-//     if (await guardUnsaved()) el.click();
-// }, true);
 
 function hasAnyTrim() {
     return (isTrimEnabled && trimMap && trimMap.gaps.length > 0) || manualTrimGaps.length > 0;
@@ -381,75 +312,6 @@ function makeSelectionShapes(x1, x2, top, height) {
     return { fill, startLine, endLine };
 }
 
-// function addShapes(chart, s) {
-//     const zr = chart.getZr();
-//     zr.add(s.fill);
-//     zr.add(s.startLine);
-//     zr.add(s.endLine);
-// }
-
-// function removeShapes(chart, s) {
-//     if (!s || !chart) return;
-//     const zr = chart.getZr();
-//     zr.remove(s.fill);
-//     zr.remove(s.startLine);
-//     zr.remove(s.endLine);
-// }
-
-// function redrawPendingRanges(chart) {
-//     if (!chart || !pendingRanges.length) return;
-
-//     const gridRect = chart.getModel().getComponent("grid", 0).coordinateSystem.getRect();
-//     const minX = gridRect.x;
-//     const maxX = gridRect.x + gridRect.width;
-
-//     pendingRanges.forEach(r => {
-//         removeShapes(chart, r.shapes);
-//         r.shapes = null;
-
-//         const vStart = effectiveTrimMap ? effectiveTrimMap.toVirtual(r.start) : r.start;
-//         const vEnd = effectiveTrimMap ? effectiveTrimMap.toVirtual(r.end) : r.end;
-
-//         const px1 = chart.convertToPixel({ xAxisIndex: 0 }, vStart);
-//         const px2 = chart.convertToPixel({ xAxisIndex: 0 }, vEnd);
-
-//         // completely outside the visible area -> don't draw
-//         if (px2 < minX || px1 > maxX) return;
-
-//         const x1 = Math.max(minX, px1);
-//         const x2 = Math.min(maxX, px2);
-//         if (x2 - x1 < 1) return;
-
-//         r.shapes = makeSelectionShapes(x1, x2, gridRect.y, gridRect.height);
-//         addShapes(chart, r.shapes);
-//     });
-
-//     chart.getZr().refresh();
-// }
-
-// function refreshTrimSelections() {
-//     if (trimRectChart && !trimRectChart.isDisposed() && pendingRanges.length) {
-//         redrawPendingRanges(trimRectChart);
-//     }
-// }
-
-// function clearTrimSelection() {
-//     if (trimRectChart) {
-//         removeShapes(trimRectChart, draftShapes);
-//         pendingRanges.forEach(r => removeShapes(trimRectChart, r.shapes));
-//         trimRectChart.getZr().refresh();
-//     }
-
-//     draftShapes = null;
-//     pendingRanges = [];
-//     trimRectChart = null;
-//     trimStart = null;
-
-//     removeTrimPopup();
-// }
-// const isDefaultActive = () => !!document.getElementById("defaultResetBtn")?.checked;
-
-
 function addShapes(chart, s) {
     const zr = chart.getZr();
     zr.add(s.fill);
@@ -484,6 +346,7 @@ function removeShapeList(list) {
 }
 
 function redrawPendingRanges() {
+    console.log("trim charts:", getTrimCharts().map(getChartKey), "ci exists:", !!window.rrChart);
     if (!pendingRanges.length) return;
     const charts = getTrimCharts();
 
@@ -533,27 +396,8 @@ function clearTrimSelection() {
 
     removeTrimPopup();
 }
-
-
-// const isDefaultActive = () =>
-//     (document.getElementById("filesDropdown")?.value ?? "raw") === "raw";
-// const isDefaultActive = () => !hasAnyTrim();
 const isDefaultActive = () =>
     (document.getElementById("filesDropdown")?.value ?? "raw") === "raw" && !hasAnyTrim();
-// function showManualTrimPopup(chart, anchorX, anchorY) {
-//     removeTrimPopup();
-
-//     const container = chart.getDom().parentElement;
-
-//     const popup = document.createElement("div");
-//     popup.className = "manual-trim-popup";
-//     popup.style.left = `${anchorX}px`;
-//     popup.style.top = `${anchorY}px`;
-//     popup.innerHTML = `
-//         <button class="manual-trim-popup__confirm"> Manual Trim</button>
-//         <button class="manual-trim-popup__cancel">✕</button>
-//     `;
-
 function showManualTrimPopup(chart, anchorX) {
     removeTrimPopup();
 
@@ -703,89 +547,6 @@ function normalizeTs(ts) {
     return ts < 1e12 ? ts * 1000 : ts;
 }
 
-// // Find SPO2 missing data periods based on the configured gap duration
-// function computeSpo2Gaps(spo2Data, gapMs = TRIM_GAP_MS) {
-
-//     // If there is not enough data, there cannot be any gap
-//     if (!spo2Data || spo2Data.length < 2) {
-//         return [];
-//     }
-
-//     // Keep only valid SPO2 readings
-//     // Remove values where SPO2 is missing or invalid
-//     const validSpo2Data = spo2Data.filter(point => {
-//         const value = point[1];
-
-//         return value !== 0 &&
-//             value !== null &&
-//             value !== undefined;
-//     });
-//     const gaps = [];
-
-//     // Compare every SPO2 point with the previous valid point
-//     for (let i = 1; i < validSpo2Data.length; i++) {
-
-//         const previousTime = validSpo2Data[i - 1][0];
-//         const currentTime = validSpo2Data[i][0];
-
-//         const missingDuration = currentTime - previousTime;
-//         // If the missing duration is greater than the allowed limit,
-//         // store this period as a trim section
-//         if (missingDuration >= gapMs) {
-
-//             gaps.push({
-//                 start: previousTime,
-//                 end: currentTime
-//             });
-
-//         }
-//     }
-
-//     return gaps;
-// }
-// merging small gaps between two points
-// function computeSpo2Gaps(spo2Data, gapMs = TRIM_GAP_MS, minValidRunMs = 10 * 1000) {
-//     if (!spo2Data || spo2Data.length < 2) return [];
-
-//     const valid = spo2Data.filter(
-//         d => d[1] !== 0 && d[1] !== null && d[1] !== undefined && !Number.isNaN(d[1])
-//     );
-
-//     if (valid.length < 2) return [];
-
-//     // Step 1: candidate silences = deltas noticeably bigger than normal sampling
-//     // (use a small floor like 3-4x the expected sample interval to exclude normal ticks)
-//     const NORMAL_TICK_MS = 2000; // every 2 seconds 1 point is coming,
-//     const SILENCE_FLOOR_MS = NORMAL_TICK_MS * 3; // e.g. 6s — anything bigger than this is suspicious
-
-//     const rawSilences = [];
-//     for (let i = 1; i < valid.length; i++) {
-//         const prevTs = valid[i - 1][0];
-//         const curTs = valid[i][0];
-//         if (curTs - prevTs >= SILENCE_FLOOR_MS) {
-//             rawSilences.push({ start: prevTs, end: curTs });
-//         }
-//     }
-
-//     if (!rawSilences.length) return [];
-
-//     // Step 2: merge silences separated by a too-short valid run
-//     const merged = [rawSilences[0]];
-//     for (let i = 1; i < rawSilences.length; i++) {
-//         const prev = merged[merged.length - 1];
-//         const cur = rawSilences[i];
-//         const validRunLength = cur.start - prev.end;
-
-//         if (validRunLength < minValidRunMs) {
-//             prev.end = cur.end;
-//         } else {
-//             merged.push(cur);
-//         }
-//     }
-
-//     // Step 3: apply the REAL gap threshold only after merging
-//     return merged.filter(g => (g.end - g.start) >= gapMs);
-// }
 //Strictly trim gap >= 2 minutes on SPO2 for auto trim 
 function computeSpo2Gaps(spo2Data, gapMs = TRIM_GAP_MS) {
     if (!spo2Data || spo2Data.length < 2) return [];
@@ -1127,7 +888,7 @@ setRestoreSwitch(!hasAnyTrimNow);
     if (isTrimEnabled) {
     printAutoTrimGaps(trimMap.gaps);
     }
-setDirty(false);
+    setDirty(false);
     windows.forEach((win, index) => {
 
         const btn = document.createElement("button");
@@ -1157,43 +918,6 @@ setDirty(false);
             btn.innerText =
                 `${start.toLocaleTimeString('en-GB', timeFmt)} - ${end.toLocaleTimeString('en-GB', timeFmt)}`;
         }
-
-        // btn.onclick = () => {
-
-        //     // Highlight selected button
-        //     container.querySelectorAll("button").forEach(b => b.classList.remove("active"));
-        //     btn.classList.add("active");
-
-        //     vitalCache = {
-
-        //         hr: prepareData(hrdata),
-
-        //         spo2: prepareData(spo2data),
-
-        //         rr: prepareData(rrdata),
-
-        //         rr1: prepareData(rrdata1),
-
-        //         odi3: prepareData(odi3data),
-
-        //         odi4: prepareData(odi4data)
-
-        //     };
-        //     // trim mode is session wide, so just keep the toggle in sync
-        //     isTrimEnabled = (sessionTrimMode === "automatic");
-        //     applyTrimButtonState(sessionTrimMode);
-        //     rebuildEffectiveTrimMap(); // restore the graph data back for auto trim enabled tab
-
-        //     loadWindow(
-        //         win,
-        //         vitalCache.hr,
-        //         vitalCache.spo2,
-        //         vitalCache.rr,
-        //         vitalCache.rr1,
-        //         vitalCache.odi3,
-        //         vitalCache.odi4
-        //     );
-        // };
 
         btn.onclick = () => {
     // user click vs. code click (first-tab auto select, ODI navigation)
@@ -1228,14 +952,19 @@ setDirty(false);
         odi3: prepareData(odi3data),
         odi4: prepareData(odi4data)
     };
+    // trim mode is session wide, so just keep the toggle in sync
     isTrimEnabled = (sessionTrimMode === "automatic");
     applyTrimButtonState(sessionTrimMode);
-    rebuildEffectiveTrimMap();
+    rebuildEffectiveTrimMap(); // restore the graph data back for auto trim enabled tab
 
     loadWindow(
         win,
-        vitalCache.hr, vitalCache.spo2, vitalCache.rr,
-        vitalCache.rr1, vitalCache.odi3, vitalCache.odi4
+        vitalCache.hr,
+        vitalCache.spo2,
+        vitalCache.rr,
+        vitalCache.rr1,
+        vitalCache.odi3,
+        vitalCache.odi4
     );
 };
 
@@ -1301,21 +1030,6 @@ function showIntervalChunk(idx) {
     loadWindow(win, vitalCache.hr, vitalCache.spo2, vitalCache.rr,
                vitalCache.rr1, vitalCache.odi3, vitalCache.odi4);
 }
-
-// intervalBtns.forEach(btn => {
-//     btn.addEventListener("click", () => {
-//         if (!allWindows.length) return;
-
-//         intervalActive = true;
-//         intervalSec = Number(btn.dataset.sec);
-
-//         // highlight only this interval tab; clear the hour tabs
-//         intervalBtns.forEach(b => b.classList.toggle("active", b === btn));
-//         document.querySelectorAll("#timeTabs button").forEach(b => b.classList.remove("active"));
-
-//         showIntervalChunk(0);                  // starts from the session start
-//     });
-// });
 
 intervalBtns.forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1497,6 +1211,10 @@ function loadWindow(win, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data) 
         updateVitalChart(window.rrChart1, rr1WindowData, [], [], initialZoomRange);
 
     }
+    // same x range on every chart, so a trim box maps to the same pixels on all four
+    const xMin = effectiveTrimMap ? effectiveTrimMap.toVirtual(win.start) : win.start;
+    const xMax = effectiveTrimMap ? effectiveTrimMap.toVirtual(win.end) : win.end;
+    getCharts().forEach(c => c.setOption({ xAxis: { min: xMin, max: xMax } }));
     requestAnimationFrame(() => getCharts().forEach(c => c.resize()));
     updateNavigationButtons();
     refreshSaveBtn(); 
@@ -1659,8 +1377,6 @@ function createTimeWindows(data, startTime, endTime) {
     });
 
     return windows;
-    //createWindowTabs(windows);
-    //  console.log("created windows", windows);
 }
 
 
@@ -1724,10 +1440,6 @@ function createVitalChart({
         (data && data.length) ||
         (data1 && data1.length) ||
         (data2 && data2.length);
-
-    //console.log("hasdata", hasData)
-    // const chart = echarts.init(document.getElementById(domId));
-    //console.log("in create chart", domId)
     const el = document.getElementById(domId);
 
 
@@ -1747,25 +1459,7 @@ function createVitalChart({
         normalizeTs(Number(d[0])),
         Number(d[1])
     ]);
-
-    //windows = createTimeWindows(rawSeriesData);
-    // console.log(
-    //     "first timestamp",
-    //     rawSeriesData[0][0],
-    //     "last timestamp",
-    //     rawSeriesData[rawSeriesData.length-1][0]
-    // );
-
-    //console.log("windows ........." ,windows.length)
-
-    // console.log("DATA:",data);
     const seriesData = downsample(data);
-    // const seriesData = data.map(d => [
-    //   Number(d[0]),
-    //   Number(d[1])
-    // ]);
-
-
     let seriesData1 = [];
     let seriesData2 = [];
 
@@ -1846,6 +1540,8 @@ function createVitalChart({
             : null,
         tooltip: {
             trigger: "axis",
+            appendToBody: true,                          // new: not clipped by the chart or covered by other rows
+            extraCssText: "z-index:99999;",   
             axisPointer: {
                 type: "cross"
             },
@@ -1867,7 +1563,6 @@ function createVitalChart({
 
                 // automatic trim
                 const rawTs = filtered[0].value[0];
-                // const realTs = (isTrimEnabled && trimMap) ? trimMap.toReal(rawTs) : rawTs; 
                 const realTs = effectiveTrimMap ? effectiveTrimMap.toReal(rawTs) : rawTs;
                 let result = echarts.format.formatTime(
                     "yyyy-MM-dd hh:mm:ss",
@@ -1889,25 +1584,19 @@ function createVitalChart({
             }
         },
 
-        // grid: {
-        //     left: 50,
-        //     right: 20,
-        //     top: 30,
-        //     bottom: 60,
-        //     containLabel: true,
-
-        // },
         grid: {
             left: 60,
             right: 20,
-            top: 30,
-            bottom: name === "RR" ? 60 : 20,
+            top: 22,                              // just enough for the overlay label / ODI legend
+            bottom: name === "RR" ? 44 : 6,       // charts 1-3 have no x labels, so almost no bottom space
             containLabel: false,
         },
 
         toolbox: {
+
+            top: 2,
             right: 15,
-            itemSize: 50,
+            itemSize: 24,
             feature: {
                 myTool1: {
                     show: false,
@@ -1922,49 +1611,73 @@ function createVitalChart({
             }
         },
 
+        // xAxis: {
+        //     type: "time",
+        //     splitLine: {
+        //         show: false
+        //     },
+        //     //   axisLabel: {
+        //     //     color: "#fff",
+        //     //     rotate: 40,
+        //     //     formatter: function (value) {
+        //     //       const d = new Date(value);
+        //     // auto trim
+        //     axisLabel: {
+        //         show: name === "RR",
+        //         color: "#fff",
+        //         rotate: 40,
+        //         // formatter: function (value) {
+        //         //   const real = (isTrimEnabled && trimMap) ? trimMap.toReal(value) : value; // ADDED
+        //         //   const d = new Date(real);
+        //         formatter: function (value) {
+        //             const real = effectiveTrimMap ? effectiveTrimMap.toReal(value) : value;
+        //             const d = new Date(real);
+
+        //             return (
+        //                 // `${d.getDate()}-${d.getMonth() + 1}` +
+        //                 `\n${String(d.getHours()).padStart(2, "0")}:` +
+        //                 `${String(d.getMinutes()).padStart(2, "0")}:` +
+        //                 `${String(d.getSeconds()).padStart(2, "0")}`
+        //             );
+        //         }
+        //     }
+        // },
         xAxis: {
             type: "time",
             splitLine: {
                 show: false
             },
-            //   axisLabel: {
-            //     color: "#fff",
-            //     rotate: 40,
-            //     formatter: function (value) {
-            //       const d = new Date(value);
-            // auto trim
+            axisTick: {
+                show: name === "RR" 
+            },
             axisLabel: {
                 show: name === "RR",
                 color: "#fff",
-                rotate: 40,
-                // formatter: function (value) {
-                //   const real = (isTrimEnabled && trimMap) ? trimMap.toReal(value) : value; // ADDED
-                //   const d = new Date(real);
+                rotate: 0,                        // was 40: rotated labels need about 35px, flat ones about 16px
+                margin: 6,
                 formatter: function (value) {
                     const real = effectiveTrimMap ? effectiveTrimMap.toReal(value) : value;
                     const d = new Date(real);
-
                     return (
-                        // `${d.getDate()}-${d.getMonth() + 1}` +
-                        `\n${String(d.getHours()).padStart(2, "0")}:` +
+                        `${String(d.getHours()).padStart(2, "0")}:` +   // removed the leading "\n"
                         `${String(d.getMinutes()).padStart(2, "0")}:` +
                         `${String(d.getSeconds()).padStart(2, "0")}`
                     );
                 }
             }
         },
-
         yAxis: {
             type: "value",
-            min: minY - 5,
-            max: maxY + 5,
+            min: minY - 3,
+            max: maxY + 3,
             splitLine: {
                 show: false
             },
             //show:true,
             axisLabel: {
                 color: "#fff",
-                show: name === "RR" ? true : true,
+                // show: name === "RR" ? true : true,
+                show: name !== "CI",  // to hide y-axis for CI chart
             }
 
         },
@@ -1996,8 +1709,11 @@ function createVitalChart({
                 ...(zoomRange ? { startValue: zoomRange.start, endValue: zoomRange.end } : { start: 0, end: 100 })
             },
             {
-                type:"slider",
+                type: "slider",
                 show: name === "RR",
+                height: 16,            // was ~30 (default)
+                bottom: 4,
+                showDetail: false, 
                 throttle: 50,
                 filterMode:"none",
                 minValueSpan: MIN_WINDOW, // to keep zoom in max to 30 seconds in charts
@@ -2086,208 +1802,81 @@ function createVitalChart({
     // ================================
     // MANUAL TRIM PORTION SELECT BOX
     // ================================
-//     chart.getZr().on("mousedown", function (e) {
-//         const sliderModel = chart.getModel().getComponent("dataZoom", 1);
+    chart.getZr().on("mousedown", function (e) {
+        const sliderModel = chart.getModel().getComponent("dataZoom", 1);
 
-//         if (sliderModel) {
-//             const dzBottom = sliderModel.get("bottom");
-//             const dzHeight = sliderModel.get("height");
+        if (sliderModel) {
+            const dzBottom = sliderModel.get("bottom");
+            const dzHeight = sliderModel.get("height");
+            const resolvedBottom = (typeof dzBottom === "number") ? dzBottom : 0;
+            const resolvedHeight = (typeof dzHeight === "number") ? dzHeight : 20;
+            const sliderTop = chart.getHeight() - resolvedBottom - resolvedHeight;
+            if (e.offsetY >= sliderTop) return;
+        }
 
-//             const resolvedBottom = (typeof dzBottom === "number") ? dzBottom : 0;
-//             const resolvedHeight = (typeof dzHeight === "number") ? dzHeight : 20;
+        const gridRect = chart.getModel().getComponent("grid", 0).coordinateSystem.getRect();
 
-//             const sliderTop = chart.getHeight() - resolvedBottom - resolvedHeight;
+        if (
+            e.offsetX < gridRect.x ||
+            e.offsetX > gridRect.x + gridRect.width ||
+            e.offsetY < gridRect.y ||
+            e.offsetY > gridRect.y + gridRect.height
+        ) {
+            return;
+        }
 
-//             if (e.offsetY >= sliderTop) {
-//                 return;
-//             }
-//         }
+        removeTrimPopup();                 // hide the button while dragging
+        trimRectChart = chart;             // the chart the drag started on
 
-//         // gridRect must be declared here, before it is used below
-//         const gridRect = chart.getModel().getComponent("grid", 0).coordinateSystem.getRect();
+        trimStart = {
+            x: e.offsetX,
+            gridMinX: gridRect.x,
+            gridMaxX: gridRect.x + gridRect.width
+        };
 
-//         // ignore clicks outside the plot area
-//         if (
-//             e.offsetX < gridRect.x ||
-//             e.offsetX > gridRect.x + gridRect.width ||
-//             e.offsetY < gridRect.y ||
-//             e.offsetY > gridRect.y + gridRect.height
-//         ) {
-//             return;
-//         }
-
-//         // clear old selections FIRST if the user switched to another chart
-//         if (trimRectChart && trimRectChart !== chart) {
-//             clearTrimSelection();
-//         }
-//         trimRectChart = chart;
-
-//         // only now set trimStart
-//         trimStart = {
-//             x: e.offsetX,
-//             gridTop: gridRect.y,
-//             gridHeight: gridRect.height,
-//             gridMinX: gridRect.x,
-//             gridMaxX: gridRect.x + gridRect.width
-//         };
-
-//         // create the draft box (saved boxes stay)
-//         removeShapes(chart, draftShapes);
-//         draftShapes = makeSelectionShapes(
-//         trimStart.x, trimStart.x,
-//         trimStart.gridTop, trimStart.gridHeight
-//         );
-//         addShapes(chart, draftShapes);
-//     });
-
-//     chart.getZr().on("mousemove", function (e) {
-//         if (!trimStart || !draftShapes) return;
-
-//         const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
-
-//         draftShapes.fill.setShape({
-//             x: Math.min(trimStart.x, clampedX),
-//             y: trimStart.gridTop,
-//             width: Math.abs(clampedX - trimStart.x),
-//             height: trimStart.gridHeight
-//         });
-
-//         draftShapes.endLine.setShape({
-//             x1: clampedX,
-//             y1: trimStart.gridTop,
-//             x2: clampedX,
-//             y2: trimStart.gridTop + trimStart.gridHeight
-//         });
-//     });
-
-//     chart.getZr().on("mouseup", function (e) {
-//         if (!trimStart) return;
-
-//         const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
-//         const startPixel = Math.min(trimStart.x, clampedX);
-//         const endPixel = Math.max(trimStart.x, clampedX);
-//         const rectBottom = trimStart.gridTop + trimStart.gridHeight;
-
-//     // the draft box is always removed; a saved box replaces it below
-//         removeShapes(chart, draftShapes);
-//         draftShapes = null;
-//         trimStart = null;
-
-//     // ignore accidental clicks (no real drag), but keep earlier selections
-//     if (endPixel - startPixel < 4) {
-//         chart.getZr().refresh();
-//         return;
-//     }
-
-//     const rawStart = chart.convertFromPixel({ xAxisIndex: 0 }, startPixel);
-//     const rawEnd = chart.convertFromPixel({ xAxisIndex: 0 }, endPixel);
-
-//     const startTime = effectiveTrimMap ? effectiveTrimMap.toReal(rawStart) : rawStart;
-//     const endTime = effectiveTrimMap ? effectiveTrimMap.toReal(rawEnd) : rawEnd;
-
-//     // Add to the list instead of replacing
-//     // pendingRanges.push({ start: startTime, end: endTime, shapes: null });
-//         // Merge with any pending range that overlaps or touches the new one
-//     let mergedStart = startTime;
-//     let mergedEnd = endTime;
-//     pendingRanges = pendingRanges.filter(r => {
-//         if (r.start <= mergedEnd && r.end >= mergedStart) {
-//             mergedStart = Math.min(mergedStart, r.start);
-//             mergedEnd = Math.max(mergedEnd, r.end);
-//             removeShapes(chart, r.shapes);   // erase the old box, the merged one is redrawn below
-//             return false;                    // drop the old range
-//         }
-//         return true;
-//     });
-//     pendingRanges.push({ start: mergedStart, end: mergedEnd, shapes: null });
-
-
-//     // console.log(`MANUAL TRIM SELECT #${pendingRanges.length} →`,
-//     //     formatTs(startTime), "-", formatTs(endTime));
-//     console.log(`MANUAL TRIM SELECT #${pendingRanges.length} →`,
-//     formatTs(mergedStart), "-", formatTs(mergedEnd));
-
-//     redrawPendingRanges(chart);
-
-//     showManualTrimPopup(chart, (startPixel + endPixel) / 2, rectBottom + 10);
-// });
-
-
-chart.getZr().on("mousedown", function (e) {
-    const sliderModel = chart.getModel().getComponent("dataZoom", 1);
-
-    if (sliderModel) {
-        const dzBottom = sliderModel.get("bottom");
-        const dzHeight = sliderModel.get("height");
-        const resolvedBottom = (typeof dzBottom === "number") ? dzBottom : 0;
-        const resolvedHeight = (typeof dzHeight === "number") ? dzHeight : 20;
-        const sliderTop = chart.getHeight() - resolvedBottom - resolvedHeight;
-        if (e.offsetY >= sliderTop) return;
-    }
-
-    const gridRect = chart.getModel().getComponent("grid", 0).coordinateSystem.getRect();
-
-    if (
-        e.offsetX < gridRect.x ||
-        e.offsetX > gridRect.x + gridRect.width ||
-        e.offsetY < gridRect.y ||
-        e.offsetY > gridRect.y + gridRect.height
-    ) {
-        return;
-    }
-
-    removeTrimPopup();                 // hide the button while dragging
-    trimRectChart = chart;             // the chart the drag started on
-
-    trimStart = {
-        x: e.offsetX,
-        gridMinX: gridRect.x,
-        gridMaxX: gridRect.x + gridRect.width
-    };
-
-    // one draft box on EVERY visible chart
-    removeShapeList(draftShapes);
-    draftShapes = [];
-    getTrimCharts().forEach(c => {
-        const r = c.getModel().getComponent("grid", 0).coordinateSystem.getRect();
-        const s = makeSelectionShapes(trimStart.x, trimStart.x, r.y, r.height);
-        addShapes(c, s);
-        draftShapes.push({ chart: c, s, top: r.y, height: r.height });
-    });
-});
-
-chart.getZr().on("mousemove", function (e) {
-    if (!trimStart || !draftShapes) return;
-
-    const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
-
-    draftShapes.forEach(({ s, top, height }) => {
-        s.fill.setShape({
-            x: Math.min(trimStart.x, clampedX),
-            y: top,
-            width: Math.abs(clampedX - trimStart.x),
-            height
-        });
-        s.endLine.setShape({
-            x1: clampedX, y1: top,
-            x2: clampedX, y2: top + height
+        // one draft box on EVERY visible chart
+        removeShapeList(draftShapes);
+        draftShapes = [];
+        getTrimCharts().forEach(c => {
+            const r = c.getModel().getComponent("grid", 0).coordinateSystem.getRect();
+            const s = makeSelectionShapes(trimStart.x, trimStart.x, r.y, r.height);
+            addShapes(c, s);
+            draftShapes.push({ chart: c, s, top: r.y, height: r.height });
         });
     });
-});
 
-chart.getZr().on("mouseup", function (e) {
-    if (!trimStart) return;
+    chart.getZr().on("mousemove", function (e) {
+        if (!trimStart || !draftShapes) return;
 
-    const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
-    const startPixel = Math.min(trimStart.x, clampedX);
-    const endPixel = Math.max(trimStart.x, clampedX);
+        const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
 
-    removeShapeList(draftShapes);
-    draftShapes = null;
-    trimStart = null;
+        draftShapes.forEach(({ s, top, height }) => {
+            s.fill.setShape({
+                x: Math.min(trimStart.x, clampedX),
+                y: top,
+                width: Math.abs(clampedX - trimStart.x),
+                height
+            });
+            s.endLine.setShape({
+                x1: clampedX, y1: top,
+                x2: clampedX, y2: top + height
+            });
+        });
+    });
 
-    // ignore accidental clicks (no real drag), keep earlier selections
-    if (endPixel - startPixel < 4) return;
+    chart.getZr().on("mouseup", function (e) {
+        if (!trimStart) return;
+
+        const clampedX = Math.min(trimStart.gridMaxX, Math.max(trimStart.gridMinX, e.offsetX));
+        const startPixel = Math.min(trimStart.x, clampedX);
+        const endPixel = Math.max(trimStart.x, clampedX);
+
+        removeShapeList(draftShapes);
+        draftShapes = null;
+        trimStart = null;
+
+        // ignore accidental clicks (no real drag), keep earlier selections
+        if (endPixel - startPixel < 4) return;
 
     const rawStart = chart.convertFromPixel({ xAxisIndex: 0 }, startPixel);
     const rawEnd = chart.convertFromPixel({ xAxisIndex: 0 }, endPixel);
@@ -2295,6 +1884,7 @@ chart.getZr().on("mouseup", function (e) {
     const startTime = effectiveTrimMap ? effectiveTrimMap.toReal(rawStart) : rawStart;
     const endTime = effectiveTrimMap ? effectiveTrimMap.toReal(rawEnd) : rawEnd;
 
+    // Add to the list instead of replacing
     // merge with any pending range that overlaps or touches the new one
     let mergedStart = startTime;
     let mergedEnd = endTime;
@@ -2317,17 +1907,10 @@ chart.getZr().on("mouseup", function (e) {
     showManualTrimPopup(chart, (startPixel + endPixel) / 2);
 });
 
-
-    // chart.off("finished");
-    // chart.on("finished", function () {
-    //     if (trimRectChart === chart) refreshTrimSelections();
-    // });
-
     chart.off("finished");
 chart.on("finished", function () {
     refreshTrimSelections();   // boxes live on all charts now
 });
-
 
     //zoom
     chart.on("dataZoom", function (params) {
@@ -2495,7 +2078,8 @@ const values = visible.map(d => d[1]).filter(v => v != null && v !== 0).concat(s
             min: minY - padding,
             max: maxY + padding,
             axisLabel: {
-                show: true//chart == window.rrChart
+                // show: true//chart == window.rrChart
+                 show: chart !== window.rrChart // to hide y-axis label for CI chart
             }
         }
     });
@@ -2650,13 +2234,6 @@ if (autoTrimSaveHandler && !(wasDefault && !isTrimEnabled)) {
     });
 });
 ///
-// document.getElementById("defaultResetBtn")?.addEventListener("click", resetTrimToDefault);
-// const restoreSwitch = document.getElementById("defaultResetBtn");
-
-// function setRestoreSwitch(on) {
-//     const el = document.getElementById("defaultResetBtn");
-//     if (el) el.checked = on;
-// }
 const filesDropdown = document.getElementById("filesDropdown");
 
 // Keeps the dropdown in sync when the code changes trim state itself.
@@ -2711,61 +2288,6 @@ async function runWithLoader(text, task) {
         try { hideBusy(); } catch (e) { console.error(e); }
     }
 }
-// restoreSwitch?.addEventListener("click", async () => {
-//     // the browser has already flipped the checkbox
-//     const turningOn = restoreSwitch.checked;
-//     restoreSwitch.disabled = true;
-
-//     try {
-//         if (turningOn) {
-//             console.log("RESTORE TOGGLE: ON(reset to default report)");
-//             await runWithLoader("Restoring default report…", resetTrimToDefault);
-//             restoreSwitch.checked = true;
-//         } else {
-//             console.log("RESTORE TOGGLE: OFF(restore last saved trim)");
-//             await runWithLoader("Restoring saved trim…", restoreLastTrim);
-//             restoreSwitch.checked = false;
-//         }
-//         // if (turningOn) {
-//         //     if (!hasAnyTrim()) {
-//         //         alert("No trimmed data available");
-//         //         restoreSwitch.checked = true;   // already on the default report
-//         //         return;                         // finally{} still re-enables the switch
-//         //     }
-//         //     console.log("RESTORE TOGGLE: ON(reset to default report)");
-//         //     await runWithLoader("Restoring default report…", resetTrimToDefault);
-//         //     restoreSwitch.checked = true;
-//         // }
-//     } catch (err) {
-//         console.error("Restore toggle failed:", err);
-//         restoreSwitch.checked = !turningOn;   // revert the switch on failure
-//     } finally {
-//         restoreSwitch.disabled = false;
-//     }
-// });
-
-// filesDropdown?.addEventListener("change", async () => {
-//     const selected = filesDropdown.value;
-//     const previous = filesDropdown.dataset.prev || "raw";
-//     filesDropdown.disabled = true;
-
-//     try {
-//         if (selected === "raw") {
-//             console.log("FILES: Raw selected (default report)");
-//             await runWithLoader("Loading raw data…", resetTrimToDefault);
-//         } else {
-//             console.log("FILES: saved file selected:", selected);
-//             await runWithLoader("Loading saved file…", restoreLastTrim);
-//         }
-//         filesDropdown.dataset.prev = selected;
-//     } catch (err) {
-//         console.error("Files dropdown failed:", err);
-//         filesDropdown.value = previous;   // revert on failure
-//     } finally {
-//         filesDropdown.disabled = false;
-//     }
-// });
-
 // Apply a saved file: its trims + its stored report (no writes to session_trim)
 async function loadSavedFileView(fileId) {
     if (!loadFileHandler) return;
@@ -2804,7 +2326,8 @@ export async function refreshFilesDropdown(selectId, apply = false) {
     selectId ||
     getSel() ||
     (files[0] && files[0].id) ||
-    "raw";
+    "raw"; //last saved file id or "raw" if no files exist
+    "raw"; // last saved file last in dropdown or "raw" if no files exist
 
     filesDropdown.innerHTML = "";
     const raw = document.createElement("option");
@@ -2829,31 +2352,6 @@ export async function refreshFilesDropdown(selectId, apply = false) {
         } catch (e) { console.error(e); }
     }
 }
-
-
-// filesDropdown?.addEventListener("change", async () => {
-//     const selected = filesDropdown.value;
-//     const previous = filesDropdown.dataset.prev || "raw";
-//     if (selected === previous) return;
-
-//     if (!(await guardUnsaved())) { filesDropdown.value = previous; return; }
-//     // filesDropdown.value = selected;
-
-//     filesDropdown.disabled = true;
-//     try {
-//         if (selected === "raw") {
-//             await runWithLoader("Loading raw data…", resetTrimToDefault);
-//         } else {
-//             await runWithLoader("Loading saved file…", () => loadSavedFileView(selected));
-//         }
-//         filesDropdown.dataset.prev = selected;
-//     } catch (err) {
-//         console.error("Files dropdown failed:", err);
-//         filesDropdown.value = previous;
-//     } finally {
-//         filesDropdown.disabled = false;
-//     }
-// });
 
 // ---------- Save ----------
 
@@ -3009,21 +2507,12 @@ function showResetButton(show) {
     getCharts().forEach(chart => {
 
         chart.setOption({
-            // toolbox: {
-            //     show: true,
-            //     feature: {
-            //         myTool1: {
-            //             show: show
-            //         }
-            //     }
-            // }
-            // (d) showResetButton: show the reset icon on the top chart only
-toolbox: {
-    show: true,
-    feature: {
-        myTool1: { show: show && chart === window.hrChart }
-    }
-}
+            toolbox: {
+                show: true,
+                feature: {
+                    myTool1: { show: show && chart === window.hrChart }
+                }
+            }
         });
 
     });
@@ -3044,10 +2533,10 @@ function updateNavigationButtons() {
     const prevButtonrr = document.getElementById("backBtnrr");
     const nextButtonrr = document.getElementById("nextBtnrr");
 
-        // interval mode (not zoomed): buttons step through chunks
+    // interval mode (not zoomed): buttons step through chunks
     if (intervalActive && intervalSec && !isManualZoom) {
         const atStart = intervalIdx <= 0;
-        const atEnd   = intervalIdx >= intervalCount() - 1;
+        const atEnd = intervalIdx >= intervalCount() - 1;
         [prevButtonhr, prevButtonspo2, prevButtonci, prevButtonrr].forEach(b => b.disabled = atStart);
         [nextButtonhr, nextButtonspo2, nextButtonci, nextButtonrr].forEach(b => b.disabled = atEnd);
         return;
@@ -3200,8 +2689,6 @@ function showNoData(domId) {
 
     chart.__rawData = [];
 }
-// export { createVitalChart, showNoData, createTimeWindows, createWindowTabs, setManualTrimSaveHandler, setAutoTrimSaveHandler, setTrimRestoreHandler, setTrimChangeHandler };
-
 export { createVitalChart, showNoData, createTimeWindows, createWindowTabs,
          setManualTrimSaveHandler, setAutoTrimSaveHandler, setTrimRestoreHandler,
          setTrimChangeHandler, setFileHandlers };
