@@ -185,8 +185,8 @@ document.addEventListener("click", async e => {
     const a = e.target.closest("a, #logout");
     if (!a || !a.closest(".top_nav, .left_col, #logout")) return;
 
-    // e.preventDefault();
-    // e.stopImmediatePropagation();
+    e.preventDefault();
+    e.stopImmediatePropagation();
     if (await guardUnsaved()) a.click();      // Yes -> go, No -> stay
 }, true);
 
