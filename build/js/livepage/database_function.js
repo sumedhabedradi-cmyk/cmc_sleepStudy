@@ -707,6 +707,21 @@ renderAnalysis(initialTrimActive);
 await refreshFilesDropdown(undefined, true);
 
 }
+
+function decodevalues(data) {
+    const values = String(data).trim().split(/\s+/).map(Number);
+    let group = "";
+    for (let i = 0; i < values.length; i += 5) {
+        let current = values[i];
+        group = group + (current + " ");
+        for (let j = 1; j < 5 && i + j < values.length; j++) {
+            current += values[i + j];
+            group = group + (current + " ");
+        }
+    }
+    return group;
+}
+
 async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestamp, completedtimestamp) {
 
  
@@ -804,35 +819,74 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
               // =========================
               let rrdata = [];
 
+              // if (rrSnap.exists()) {
+              //   rrSnap.forEach((child) => {
+              //     const value = child.val();
+              //     const timestamp = Number(value?.timestamp);
+
+              //     if (!value?.values) return;
+
+              //     const matches = value.values.match(/\[([^\]]+)\]/g);
+              //     if (!matches) return;
+
+              //     const rrArray = matches
+              //       .map(group =>
+              //         group
+              //           .replace(/\[|\]/g, "")
+              //           .split(",")
+              //           .map(v => Number(v.trim()))
+              //       )
+              //       .flat();
+
+              //     const interval = 40; // adjust if needed (1 sec, 2 sec, etc.), for CI every 40ms one point is coming
+              //     const base = timestamp *1000
+              //     rrArray.forEach((rr, i) => {
+              //       rrdata.push([
+              //         base + i * interval,
+              //         rr
+              //       ]);
+              //     });
+              //   });
+              // }
               if (rrSnap.exists()) {
-                rrSnap.forEach((child) => {
-                  const value = child.val();
-                  const timestamp = Number(value?.timestamp);
+  rrSnap.forEach((child) => {
+    const value = child.val();
 
-                  if (!value?.values) return;
+    // old format: { timestamp, values: "[a, b][c, d]" }
+    // new format: { ts, resp: "a b c d" }
+    const timestamp = Number(value?.timestamp ?? value?.ts);
+    const raw = value?.values ?? value?.resp;
+    if (!raw) return;
 
-                  const matches = value.values.match(/\[([^\]]+)\]/g);
-                  if (!matches) return;
+    let rrArray;
+    const matches = String(raw).match(/\[([^\]]+)\]/g);
 
-                  const rrArray = matches
-                    .map(group =>
-                      group
-                        .replace(/\[|\]/g, "")
-                        .split(",")
-                        .map(v => Number(v.trim()))
-                    )
-                    .flat();
+    if (matches) {
+      // old format (unchanged logic)
+      rrArray = matches
+        .map(group =>
+          group
+            .replace(/\[|\]/g, "")
+            .split(",")
+            .map(v => Number(v.trim()))
+        )
+        .flat();
+    } else {
+      // new format: delta-encoded, decode first
+      rrArray = decodevalues(raw)
+        .trim()
+        .split(/\s+/)
+        .map(Number)
+        .filter(Number.isFinite);
+    }
 
-                  const interval = 40; // adjust if needed (1 sec, 2 sec, etc.), for CI every 40ms one point is coming
-                  const base = timestamp *1000
-                  rrArray.forEach((rr, i) => {
-                    rrdata.push([
-                      base + i * interval,
-                      rr
-                    ]);
-                  });
-                });
-              }
+    const interval = 40; // unchanged
+    const base = timestamp * 1000;
+    rrArray.forEach((rr, i) => {
+      rrdata.push([base + i * interval, rr]);
+    });
+  });
+}
 
               console.log("RR DATA FINAL:", rrdata);
               let windows  = createTimeWindows((completedtimestamp-starttimestamp),starttimestamp,completedtimestamp)

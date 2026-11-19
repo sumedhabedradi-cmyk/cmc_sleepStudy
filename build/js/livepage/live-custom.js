@@ -185,8 +185,8 @@ document.addEventListener("click", async e => {
     const a = e.target.closest("a, #logout");
     if (!a || !a.closest(".top_nav, .left_col, #logout")) return;
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
+    // e.preventDefault();
+    // e.stopImmediatePropagation();
     if (await guardUnsaved()) a.click();      // Yes -> go, No -> stay
 }, true);
 
@@ -1068,8 +1068,8 @@ intervalBtns.forEach(btn => {
         if (!region.classList.contains("region-disabled")) return;
         if (!e.isTrusted) return;          // let code-triggered clicks (ODI navigation) through
 
-        e.stopPropagation();               // don't let the click hit a tab button
-        e.preventDefault();
+        // e.stopPropagation();               // don't let the click hit a tab button
+        // e.preventDefault();
 
         // release both regions and clear highlights; charts stay as they are
         hourActive = false;
@@ -1319,6 +1319,7 @@ function updateVitalChart(chart, data, data1 = [], data2 = [], zoomRange = null)
                 { start: 0, end: 100 }
             ]
     }, false);
+    setNoData(chart, lineData.length === 0 && scatter1.length === 0 && scatter2.length === 0);
 }
 
 
@@ -1425,6 +1426,23 @@ let ignoreZoomEvent = false;
 
 
 let isManualZoom = false;
+
+function setNoData(chart, show) {
+    const el = chart.getDom();
+    let o = el.querySelector(":scope > .nodata-overlay");
+    if (!o) {
+        o = document.createElement("div");
+        o.className = "nodata-overlay";
+        o.textContent = "No Data Available";
+        o.style.cssText =
+            "position:absolute;left:0;top:0;right:0;bottom:0;display:flex;" +
+            "align-items:center;justify-content:center;color:#999;font-size:18px;" +
+            "font-weight:bold;pointer-events:none;z-index:10;";
+        el.appendChild(o);
+    }
+    o.style.display = show ? "flex" : "none";
+}
+
 function createVitalChart({
     domId,
     data,
@@ -1525,19 +1543,19 @@ function createVitalChart({
     const maxY = nonZeroValues.length ? Math.max(...nonZeroValues) : 100;
     const latestTs = seriesData[seriesData.length - 1]?.[0] || 0;
     const option = {
-        graphic: !hasData
-            ? {
-                type: 'text',
-                left: 'center',
-                top: 'middle',
-                style: {
-                    text: 'No Data Available',
-                    fill: '#999',
-                    fontSize: 18,
-                    fontWeight: 'bold'
-                }
-            }
-            : null,
+        // graphic: !hasData
+        //     ? {
+        //         type: 'text',
+        //         left: 'center',
+        //         top: 'middle',
+        //         style: {
+        //             text: 'No Data Available',
+        //             fill: '#999',
+        //             fontSize: 18,
+        //             fontWeight: 'bold'
+        //         }
+        //     }
+        //     : null,
         tooltip: {
             trigger: "axis",
             appendToBody: true,                          // new: not clipped by the chart or covered by other rows
@@ -1713,7 +1731,7 @@ function createVitalChart({
                 show: name === "RR",
                 height: 16,            // was ~30 (default)
                 bottom: 4,
-                showDetail: false, 
+                showDetail: true, 
                 throttle: 50,
                 filterMode:"none",
                 minValueSpan: MIN_WINDOW, // to keep zoom in max to 30 seconds in charts
@@ -1777,6 +1795,7 @@ function createVitalChart({
             }
         ]
     };
+    setNoData(chart, !hasData);
     // chart.clear()
     //changed this to remove coordinate system error when no data is available
     // if (!seriesData.length) {
