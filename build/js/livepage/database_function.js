@@ -9,6 +9,7 @@ import { showNoData, createTimeWindows, createWindowTabs, setManualTrimSaveHandl
 installGlobalEchartsAutoResize();
 
 // [{start,end}] (ms), "s1,e1,s2,e2" (seconds)
+// Converts trim gaps from milliseconds to seconds.
 function formatRanges(gaps) {
    const arr = [];
     gaps.forEach(g => {
@@ -18,12 +19,14 @@ function formatRanges(gaps) {
     return arr;
 }
 // compare by key, because Firebase returns keys in a different order
+// Compares two Firebase values by their sorted object keys and JSON content.
 const sameData = (a, b) => {
     const k = o => Object.keys(o || {}).sort().map(x => x + ":" + JSON.stringify(o[x])).join("|");
     return k(a) === k(b);
 };
 // session_trim/{UUID}/{docId}/{session start ts}/manual_trim/{chartKey}/[0..n]
 // async function saveManualTrim(gapsByChart) {
+// Saves manual trim ranges for each chart to Firebase.
 async function saveManualTrim(gapsByChart, clearFirst = false) {
     const uuid = localStorage.getItem("patient_unique_id");
     const docId = localStorage.getItem("doc_registerId");
@@ -82,6 +85,7 @@ setManualTrimSaveHandler(saveManualTrim);
 
 // session_trim/{UUID}/{docId}/{session start ts}/auto_trim/spo/[0..n]
 // async function saveAutoTrim(gaps) {
+// Saves or removes automatic SpO2 trim gaps in Firebase.
 async function saveAutoTrim(gaps, clearFirst = false) {
     const uuid = localStorage.getItem("patient_unique_id");
     const docId = localStorage.getItem("doc_registerId");
@@ -137,6 +141,7 @@ async function saveAutoTrim(gaps, clearFirst = false) {
 setAutoTrimSaveHandler(saveAutoTrim);
 
 // session_trim/{UUID}/{docId}/{session start ts}
+// Gets the Firebase reference for the current session's trim data.
 function getTrimBaseRef() {
     const uuid = localStorage.getItem("patient_unique_id");
     const docId = localStorage.getItem("doc_registerId");
@@ -150,6 +155,7 @@ function getTrimBaseRef() {
         .child("session_trim").child(uuid).child(docId).child(sessionStart);
 }
 
+// Converts saved range values into timestamp gap objects.
 function parseRanges(raw) {
     let nums;
     if (Array.isArray(raw)) {
@@ -184,6 +190,7 @@ function parseRanges(raw) {
 // setTrimResetHandler(resetTrimInDb);
 
 // LOAD saved trim when the page opens
+// Loads saved trim data for the current session.
 async function loadSavedTrim() {
     const base = getTrimBaseRef();
     if (!base) return null;
@@ -201,6 +208,7 @@ async function loadSavedTrim() {
         return null;   // on error, live-custom.js keeps its local state
     }
 }
+// Loads the most recently saved trim for the current patient.
 async function loadLatestTrim() {
     const uuid = localStorage.getItem("patient_unique_id");
     const docId = localStorage.getItem("doc_registerId");
@@ -233,6 +241,7 @@ setTrimRestoreHandler(loadLatestTrim);
 let latestAnalysis = null;   // last report painted
 
 // TODO: point this at wherever you store the logged-in doctor's name
+// Gets the logged-in doctor's display name.
 function getDoctorName() {
     return localStorage.getItem("docname") || "Unknown";
 }
@@ -288,8 +297,10 @@ function getDoctorName() {
 // }
 
 // ---------- Saved files: svdby/{uid}/{report name}/{session timestamp} ----------
+// Converts a saved file name into a safe Firebase key.
 const safeKey = n => String(n).trim().replace(/[.$#\[\]\/]/g, "_");
 
+// Gets the Firebase root used for saved reports.
 function getReportsRoot() {
     return fb.database().ref().child("svdby").child(id);
 }
@@ -336,6 +347,7 @@ const ANALYSIS_FIELDS = [
 //     await ref.set(record);
 //     return key;
 // }
+// Saves the current report and its trim settings under a file name.
 async function saveCurrentAnalysis(fileName) {
     if (waiting) throw new Error("REPORT_PENDING");
     if (!latestAnalysis) throw new Error("NO_REPORT");
@@ -382,6 +394,7 @@ console.log("SAVE: session source =", sA.exists() ? "session/id/docId/ts" : sB.e
     return key;
 }
 
+// Lists saved reports for the current session.
 async function listSavedFiles() {
     const snap = await getReportsRoot().once("value");
     const out = [];
@@ -398,6 +411,7 @@ async function listSavedFiles() {
     return out.sort((a, b) => b.saved_ts - a.saved_ts);
 }
 
+// Loads a saved report and its trim settings.
 async function loadSavedFile(fileId) {
     const v = (await getReportsRoot().child(fileId).child(timestamp).once("value")).val();
     if (!v) return null;
@@ -420,6 +434,7 @@ async function loadSavedFile(fileId) {
 //     if (analysis && paintFn) paintFn(analysis);
 // }
 
+// Paints a saved report and removes the analysis listener.
 function paintSavedAnalysis(analysis) {
     if (analysisRef) { analysisRef.off(); analysisRef = null; }
     stopWaiting();
@@ -431,6 +446,7 @@ setFileHandlers({ save: saveCurrentAnalysis, list: listSavedFiles, load: loadSav
 
 let id = "";
 let timestamp = "";
+// Initializes chart loading after the page document is ready.
 function init_echarts() {
   $(document).ready(() => {
     try {
@@ -476,6 +492,7 @@ function init_echarts() {
 let initialTrimActive = false;
 let analysisRef = null;
 let paintFn = null;   // set inside getAllParameters
+// Checks whether a saved trim has automatic or manual gaps.
 const trimActive = t => !!t && (t.hasAuto || Object.values(t.manual).some(g => g.length > 0));
 
 // setTrimChangeHandler(active => renderAnalysis(active));
@@ -484,6 +501,7 @@ const trimActive = t => !!t && (t.hasAuto || Object.values(t.manual).some(g => g
 // fb.database().ref(".info/connected").on("value", s => { online = s.val() === true; });
 let waiting = false, waitBaselineSet = false, waitBaseline = null;
 
+// Stops the report loading state and hides the loader.
 function stopWaiting() {
   waiting = false;
   // clearTimeout(waitTimer);
@@ -491,6 +509,7 @@ function stopWaiting() {
   if (l) l.style.display = "none";
 }
 
+// Loads the default or trimmed analysis report and listens for updates.
 function renderAnalysis(useTrim, waitForUpdate = false) {
   if (analysisRef) analysisRef.off();
   stopWaiting();
@@ -554,6 +573,7 @@ function renderAnalysis(useTrim, waitForUpdate = false) {
 setTrimChangeHandler((active, wait) => renderAnalysis(active, wait));
 
 // async function getAllParameters(timestamp) {
+// Loads session details, oxygen values, and report analysis for one timestamp.
 async function getAllParameters(ts) {    //to show linked details to perticular session instead of showing same data to all sessions
   timestamp = ts;
 
@@ -708,6 +728,7 @@ await refreshFilesDropdown(undefined, true);
 
 }
 
+// Decodes delta-encoded respiration values into a space-separated string.
 function decodevalues(data) {
     const values = String(data).trim().split(/\s+/).map(Number);
     let group = "";
@@ -722,6 +743,7 @@ function decodevalues(data) {
     return group;
 }
 
+// Loads SpO2, heart rate, respiration, and ODI data for the session charts.
 async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestamp, completedtimestamp) {
 
  
@@ -882,6 +904,7 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
 
     const interval = 40; // unchanged
     const base = timestamp * 1000;
+    //-ve values are included
     rrArray.forEach((rr, i) => {
       rrdata.push([base + i * interval, rr]);
     });
@@ -891,7 +914,8 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
               console.log("RR DATA FINAL:", rrdata);
               let windows  = createTimeWindows((completedtimestamp-starttimestamp),starttimestamp,completedtimestamp)
               // createWindowTabs(windows,hrdata,spo2data,rrdata,rrdata1,odi3data,odi4data);
-              const savedTrim = await loadSavedTrim();
+              // const savedTrim = await loadSavedTrim();
+              const savedTrim = null;
               // initialTrimActive = trimActive(savedTrim);  
               initialTrimActive = false;
               createWindowTabs(windows, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data, savedTrim);
@@ -906,6 +930,7 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
 }
 
 
+// Converts decimal minutes into a short hours-and-minutes string.
 function splitTimeString(num) {
   const [minStr, secStr] = String(num).split('.');
   //to show linked details to perticular session instead of showing same data to all sessions
@@ -919,6 +944,7 @@ const min = minutes % 60;
   // return `${hours} hr ${minutes} min ${seconds} sec`;
   return `${hours}h ${min}min`;
 }
+// Returns the matching Font Awesome battery icon for a percentage.
 function getBatteryIcon(batteryPercentage) {
   if (batteryPercentage >= 90) {
     return '<i class="fa fa-battery-full" aria-hidden="true"></i> ';

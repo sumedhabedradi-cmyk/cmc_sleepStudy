@@ -1,13 +1,18 @@
 
 let isZoomed = false;
 const SEL_KEY = "lastTrimmedFileId";
-const getSel = () => sessionStorage.getItem(SEL_KEY);
-const setSel = v => sessionStorage.setItem(SEL_KEY, v);
+const selKey = () => SEL_KEY + "_" +
+    (localStorage.getItem("patient_unique_id") || "") + "_" +
+    (localStorage.getItem("sessiontimestamp") || "");
+const getSel = () => sessionStorage.getItem(selKey());
+const setSel = v => sessionStorage.setItem(selKey(), v);
 localStorage.removeItem(SEL_KEY);   // drop the old localStorage copy
 
-// logout -> forget the selection, so the next login opens the latest saved file
+// logout -> forget every stored selection, so the next login opens the latest saved file
 document.getElementById("logout")?.addEventListener("click", () => {
-    sessionStorage.removeItem(SEL_KEY);
+    Object.keys(sessionStorage)
+        .filter(k => k.startsWith(SEL_KEY))
+        .forEach(k => sessionStorage.removeItem(k));
 }, true);
 
 const MAX_POINTS = 120000;
@@ -48,6 +53,7 @@ window.getEffectiveTrimMap = () => effectiveTrimMap;
 // manual trim 
 let savedAutoGaps = null;   // auto-trim gaps loaded from an svdby file
 
+// Rebuilds the combined automatic and manual trim map.
 function rebuildEffectiveTrimMap() {
     const gaps = [];
     if (isTrimEnabled) {
@@ -71,32 +77,38 @@ let trimPopup = null;
 
 // to save manual trim data in db
 let manualTrimSaveHandler = null;
+// Sets the handler used to save manual trim ranges.
 function setManualTrimSaveHandler(fn) {
     manualTrimSaveHandler = fn;
 }
 
 // to save auto trim data in db
 let autoTrimSaveHandler = null;
+// Sets the handler used to save automatic trim gaps.
 function setAutoTrimSaveHandler(fn) {
     autoTrimSaveHandler = fn;
 }
 
 // to remove saved trim in db on reset
 let trimResetHandler = null;
+// Sets the handler used to remove saved trim data.
 function setTrimResetHandler(fn) {
     trimResetHandler = fn;
 }
 
 // tell database_function.js whether a trim is active, so it switches DB node
 let trimChangeHandler = null;
+// Sets the handler notified when trim mode changes.
 function setTrimChangeHandler(fn) { trimChangeHandler = fn; }
 
+// Notifies other modules that trim mode changed.
 function notifyTrimChange(active, waitForUpdate = false) {
     return trimChangeHandler ? trimChangeHandler(active, waitForUpdate) : Promise.resolve();
 }
 
 // ---------- file handlers (registered by database_function.js) ----------
 let saveFileHandler = null, listFilesHandler = null, loadFileHandler = null, paintSavedHandler = null;
+// Registers handlers for saving, listing, loading, and painting files.
 function setFileHandlers({ save, list, load, paint }) {
     saveFileHandler = save; listFilesHandler = list; loadFileHandler = load; paintSavedHandler = paint;
 }
@@ -104,6 +116,7 @@ function setFileHandlers({ save, list, load, paint }) {
 let cleanSig = "";
 let baselineSet = false;          // no baseline yet -> never "dirty"
 
+// Creates a signature representing the current trim state.
 function trimSig() {
     const auto = isTrimEnabled ? (savedAutoGaps || (trimMap && trimMap.gaps) || []) : [];
     return JSON.stringify({
@@ -113,6 +126,7 @@ function trimSig() {
 }
 const isDirty = () => baselineSet && trimSig() !== cleanSig;
 
+// Updates the save button based on unsaved changes.
 function refreshSaveBtn() {
     const btn = document.getElementById("saveFileBtn");
     if (!btn) return;
@@ -123,12 +137,14 @@ function refreshSaveBtn() {
     btn.classList.toggle("has-changes", canSave);
 }
 
+// Records or clears the current saved baseline.
 function setDirty(v) {
     if (!v) { cleanSig = trimSig(); baselineSet = true; }
     refreshSaveBtn();
 }
 
 // generic modal: confirm (true/false)
+// Displays a confirmation or text-input modal and returns the user's result.
 function showModal({ message, input = false, yesText = "Yes", noText = "No" }) {
     return new Promise(resolve => {
         const ov = document.createElement("div");
@@ -169,6 +185,7 @@ function showModal({ message, input = false, yesText = "Yes", noText = "No" }) {
 }
 
 // true = proceed with the navigation / file switch, false = stay on the page
+// Checks for unsaved changes and asks the user before leaving.
 async function guardUnsaved() {
     if (!isDirty()) return true;                 // nothing unsaved -> no popup
     const yes = await showModal({
@@ -177,9 +194,11 @@ async function guardUnsaved() {
     });
     if (!yes) return false;                      // No  -> stay, keep changes
     clearTrimSelection();                        // Yes -> discard and proceed
+    setDirty(false);  
     return true;
 }
 
+// Stops navigation while unsaved trim changes need confirmation.
 document.addEventListener("click", async e => {
     if (!e.isTrusted || !isDirty()) return;
     const a = e.target.closest("a, #logout");
@@ -190,11 +209,31 @@ document.addEventListener("click", async e => {
     if (await guardUnsaved()) a.click();      // Yes -> go, No -> stay
 }, true);
 
+
+// refresh / close tab (browsers only allow their own generic text here)
+window.addEventListener("beforeunload", e => {
+    if (!isDirty()) return;
+    e.preventDefault();
+    e.returnValue = "";
+});
+
+// browser back arrow: show our own modal
+if (!history.state || !history.state.guard) {
+    history.pushState({ guard: true }, "", location.href);
+}
+window.addEventListener("popstate", async () => {
+    if (!isDirty()) { history.back(); return; }
+    history.pushState({ guard: true }, "", location.href);   // stay while we ask
+    if (await guardUnsaved()) history.go(-2);                // Yes: leave. No: stay
+});
+
+// Checks whether any automatic or manual trim is active.
 function hasAnyTrim() {
     return (isTrimEnabled && trimMap && trimMap.gaps.length > 0) || manualTrimGaps.length > 0;
 }
 
 // Default reset: remove auto + manual trim, show all data like a fresh page load
+// Resets all trim selections and restores the untrimmed view.
 async function resetTrimToDefault() {
     // if (!confirm("Reset to default? All auto and manual trims will be removed.")) return false;
     if (trimResetHandler) await trimResetHandler();
@@ -236,10 +275,12 @@ async function resetTrimToDefault() {
     return true;
 }
 let trimRestoreHandler = null;
+// Sets the handler used to restore a previously saved trim.
 function setTrimRestoreHandler(fn) {
     trimRestoreHandler = fn;
 }
 
+// Restores saved automatic and manual trim selections.
 async function restoreLastTrim() {
     if (!trimRestoreHandler) return;
 
@@ -273,6 +314,8 @@ async function restoreLastTrim() {
     updateNavigationButtons();
     await reportReady;
 }
+
+// Gets a short key for identifying the chart type.
 function getChartKey(chart) {
     if (chart === window.hrChart) return "hr";
     if (chart === window.spo2Chart) return "spo";
@@ -281,7 +324,7 @@ function getChartKey(chart) {
     return "unknown";
 }
 
-
+// Removes the active manual trim popup.
 function removeTrimPopup() {
     if (trimPopup) {
         trimPopup.remove();
@@ -289,7 +332,7 @@ function removeTrimPopup() {
     }
 }
 
-
+// Creates the visual shapes used to mark a manual trim range.
 function makeSelectionShapes(x1, x2, top, height) {
     const fill = new echarts.graphic.Rect({
         shape: { x: Math.min(x1, x2), y: top, width: Math.abs(x2 - x1), height },
@@ -312,6 +355,7 @@ function makeSelectionShapes(x1, x2, top, height) {
     return { fill, startLine, endLine };
 }
 
+// Adds selection shapes to a chart.
 function addShapes(chart, s) {
     const zr = chart.getZr();
     zr.add(s.fill);
@@ -319,6 +363,7 @@ function addShapes(chart, s) {
     zr.add(s.endLine);
 }
 
+// Removes selection shapes from a chart.
 function removeShapes(chart, s) {
     if (!s || !chart) return;
     const zr = chart.getZr();
@@ -336,6 +381,7 @@ function getTrimCharts() {
 }
 
 // a selection is now a list of { chart, s } (one box per chart)
+// Removes all visual shapes in a list.
 function removeShapeList(list) {
     if (!list) return;
     list.forEach(({ chart, s }) => {
@@ -345,6 +391,7 @@ function removeShapeList(list) {
     });
 }
 
+// Redraws saved and pending manual trim ranges.
 function redrawPendingRanges() {
     console.log("trim charts:", getTrimCharts().map(getChartKey), "ci exists:", !!window.rrChart);
     if (!pendingRanges.length) return;
@@ -381,10 +428,12 @@ function redrawPendingRanges() {
     charts.forEach(c => c.getZr().refresh());
 }
 
+// Refreshes displayed trim selections.
 function refreshTrimSelections() {
     if (pendingRanges.length) redrawPendingRanges();
 }
 
+// Clears draft and pending manual trim selections.
 function clearTrimSelection() {
     removeShapeList(draftShapes);
     pendingRanges.forEach(r => removeShapeList(r.shapes));
@@ -396,8 +445,12 @@ function clearTrimSelection() {
 
     removeTrimPopup();
 }
+
+// Checks whether the raw, untrimmed view is active.
 const isDefaultActive = () =>
     (document.getElementById("filesDropdown")?.value ?? "raw") === "raw" && !hasAnyTrim();
+
+// Shows the manual trim popup and its confirm/cancel actions.
 function showManualTrimPopup(chart, anchorX) {
     removeTrimPopup();
 
@@ -530,6 +583,7 @@ let zoomRafScheduled = false;
 let resetButtonVisible = false;
 //
 
+// Reads all saved trim selections from browser storage.
 function getAllTrimStore() {
     try {
         return JSON.parse(localStorage.getItem(TRIM_STORAGE_KEY) || "{}");
@@ -538,16 +592,19 @@ function getAllTrimStore() {
     }
 }
 
+// Saves all trim selections to browser storage.
 function saveTrimStore(allStore) {
     localStorage.setItem(TRIM_STORAGE_KEY, JSON.stringify(allStore));
 }
 
+// Converts a timestamp to milliseconds.
 function normalizeTs(ts) {
     ts = Number(ts);
     return ts < 1e12 ? ts * 1000 : ts;
 }
 
 //Strictly trim gap >= 2 minutes on SPO2 for auto trim 
+// Finds gaps in SpO2 data based on the configured gap duration.
 function computeSpo2Gaps(spo2Data, gapMs = TRIM_GAP_MS) {
     if (!spo2Data || spo2Data.length < 2) return [];
 
@@ -572,7 +629,8 @@ function computeSpo2Gaps(spo2Data, gapMs = TRIM_GAP_MS) {
     return gaps.filter(g => (g.end - g.start) >= gapMs);
 }
 
-// Add this helper above buildTrimMap
+
+// Combines overlapping or adjacent trim gaps.
 function mergeGaps(gaps) {
     if (!gaps.length) return [];
 
@@ -601,8 +659,8 @@ function formatTs(ts) {
     return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ` +
            `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
-//to print start and end time and gap of the session for auto trim gaps
-function printAutoTrimGaps(gaps, windows = allWindows) {
+// Prints automatic trim gap details for debugging.
+async function printAutoTrimGaps(gaps, windows = allWindows) {
     if (!gaps || !gaps.length) {
         console.log("AUTO TRIM: no gaps found in this session");
         return;
@@ -624,9 +682,11 @@ function printAutoTrimGaps(gaps, windows = allWindows) {
     console.log(`AUTO TRIM: session ${currentSessionKey}: ${gaps.length} gap(s)`);
     console.log(rows);
 }
+// Builds functions to convert timestamps between real and trimmed timelines.
 function buildTrimMap(gaps, keepGapMs = 2000) { 
     const sortedGaps = mergeGaps(gaps);
 
+    // Converts a real timestamp to the position in the trimmed timeline.
     function toVirtual(realTimestamp) {
         let removedTime = 0;
 
@@ -649,6 +709,7 @@ function buildTrimMap(gaps, keepGapMs = 2000) {
         return realTimestamp - removedTime;
     }
 
+    // Converts a trimmed timeline position back to a real timestamp.
     function toReal(virtualTimestamp) {
         let removedTime = 0;
 
@@ -709,7 +770,7 @@ function applyTrim(data, trimMap) {
     return trimmedData;
 }
 
-// Converts incoming API data into chart ready format
+// Cleans and normalizes chart data.
 function prepareData(data) {
     if (!data || data.length === 0) {
         return [];
@@ -726,6 +787,7 @@ function prepareData(data) {
 
     });
 }
+// Reduces large datasets to a maximum number of chart points.
 function downsample(arr) {
     if (arr.length <= MAX_POINTS) return arr;
 
@@ -741,6 +803,7 @@ function downsample(arr) {
     return sampled;
 }
 
+// Zooms in on the currently selected chart window.
 function zoomIn() {
 
     const chart = activeChart || window.hrChart;
@@ -771,6 +834,7 @@ function zoomIn() {
     //showResetButton(true);
 }
 
+// Zooms out to the previous chart window size.
 function zoomOut() {
     isManualZoom = true
     // console.log(window.hrChart);
@@ -801,6 +865,7 @@ function zoomOut() {
     );
 
 }
+// Filters chart data to a selected time window.
 function filterWindowData(data, start, end) {
 
     if (!data || !data.length)
@@ -818,18 +883,20 @@ function filterWindowData(data, start, end) {
     return windowed;
 }
 
-function padGapsForSeam(gaps, keepGapMs = 2000) {
-    return gaps.map(g => {
-        const duration = g.end - g.start;
-        if (duration <= keepGapMs) return g; // too short to shrink, leave as is
-        return {
-            start: g.start,
-            end: g.end - keepGapMs   
-        };
-    });
-}
+// Adds small padding around trim gaps for display continuity.
+// function padGapsForSeam(gaps, keepGapMs = 2000) {
+//     return gaps.map(g => {
+//         const duration = g.end - g.start;
+//         if (duration <= keepGapMs) return g; // too short to shrink, leave as is
+//         return {
+//             start: g.start,
+//             end: g.end - keepGapMs   
+//         };
+//     });
+// }
 
 let activeChart = null;
+// Creates time-window tabs and loads the initial report view.
 function createWindowTabs(windows, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data, savedTrim = null) {
 
     const container = document.getElementById("timeTabs");
@@ -847,7 +914,8 @@ const sessionKey = `${doctorId}_${patientId}_${firstWindow ? firstWindow.start :
     if (sessionKey !== currentSessionKey) {
         currentSessionKey = sessionKey;
         const allStore = getAllTrimStore();
-        sessionTrimMode = typeof allStore[sessionKey] === "string" ? allStore[sessionKey] : "";
+        // sessionTrimMode = typeof allStore[sessionKey] === "string" ? allStore[sessionKey] : "";
+        sessionTrimMode = "";   // don't restore the unsaved auto-trim toggle
         manualTrimGaps = [];   // manual trims belong to a session, so reset on a new one
     }
 
@@ -885,9 +953,19 @@ setRestoreSwitch(!hasAnyTrimNow);
     // console.log("GAP:",trimMap);
     // console.log("Trim map Gap", trimMap.gaps);
     // to print auto trim gaps in console for the session
-    if (isTrimEnabled) {
-    printAutoTrimGaps(trimMap.gaps);
-    }
+    // if (isTrimEnabled) {
+    // printAutoTrimGaps(trimMap.gaps);
+    // }
+    // stale "automatic" mode but this session has no gaps -> turn it off silently (no popup)
+if (isTrimEnabled && !trimMap.gaps.length) {
+    isTrimEnabled = false;
+    sessionTrimMode = "";
+    applyTrimButtonState("");
+    const s = getAllTrimStore();
+    s[currentSessionKey] = "";
+    saveTrimStore(s);
+    rebuildEffectiveTrimMap();
+}
     setDirty(false);
     windows.forEach((win, index) => {
 
@@ -985,6 +1063,7 @@ let intervalActive = false;
 let hourActive = false;
 let programmaticTabClick = false;   // set when code (not the user) clicks an hour tab
 
+// Updates the active hour or interval region selection.
 function applyRegionState() {
     document.getElementById("hourRegion")
         ?.classList.toggle("region-disabled", intervalActive);
@@ -995,11 +1074,13 @@ let intervalSec = 0;      // 0 = "All"
 let intervalIdx = 0;      // current chunk number
 const intervalBtns = [...document.querySelectorAll("#intervalTabs button")];
 
+// Returns the number of interval chunks for the selected duration.
 function intervalCount() {
     const all = allWindows.find(w => w.label === "All");
     return all && intervalSec ? Math.ceil((all.end - all.start) / (intervalSec * 1000)) : 1;
 }
 
+// Displays the selected interval chunk.
 function showIntervalChunk(idx) {
     const all = allWindows.find(w => w.label === "All");
     if (!all) return;
@@ -1084,6 +1165,7 @@ intervalBtns.forEach(btn => {
     }, true);
 });
 
+// Loads chart data for a selected time window.
 function loadWindow(win, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data) {
 
     selectedWindow = win;
@@ -1229,6 +1311,7 @@ function loadWindow(win, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data) 
     }
 }
 
+// Updates a vital chart with available data and zoom settings.
 function updateVitalChart(chart, data, data1 = [], data2 = [], zoomRange = null) {
 
     const normalizeTs = ts => Number(ts) < 1e12 ? Number(ts) * 1000 : Number(ts);
@@ -1323,6 +1406,7 @@ function updateVitalChart(chart, data, data1 = [], data2 = [], zoomRange = null)
 }
 
 
+// Splits the report timeline into time-window tabs.
 function createTimeWindows(data, startTime, endTime) {
     //   console.log("start windows time", data, ":" +   startTime, ":" + endTime);
     if (!data || data.length === 0)
@@ -1382,6 +1466,7 @@ function createTimeWindows(data, startTime, endTime) {
 
 
 
+// Finds data within visible chart boundaries using binary search.
 function getVisibleData(data, start, end) {
 
     let left = 0;
@@ -1413,6 +1498,7 @@ function getVisibleData(data, start, end) {
 
     return data.slice(startIndex, right + 1);
 }
+// Returns all available report charts.
 function getCharts() {
     return [
         window.hrChart,
@@ -1427,6 +1513,7 @@ let ignoreZoomEvent = false;
 
 let isManualZoom = false;
 
+// Shows or hides the no-data overlay for a chart.
 function setNoData(chart, show) {
     const el = chart.getDom();
     let o = el.querySelector(":scope > .nodata-overlay");
@@ -1443,6 +1530,7 @@ function setNoData(chart, show) {
     o.style.display = show ? "flex" : "none";
 }
 
+// Creates a configured ECharts vital chart.
 function createVitalChart({
     domId,
     data,
@@ -2002,6 +2090,7 @@ chart.on("finished", function () {
 //         w => w.label !== "All" && ts >= w.start && ts <= w.end
 //     );
 // auto trim
+// Opens the interval and window containing an ODI event timestamp.
 function navigateToOdiEvent(ts) {
 
     const realTs = effectiveTrimMap ? effectiveTrimMap.toReal(ts) : ts;
@@ -2034,6 +2123,7 @@ window.addEventListener("resize", () => {
 
 
 // function updateYAxis(chart) {
+// Updates chart Y-axis limits for the selected zoom range.
 function updateYAxis(chart, dz) {
     dz = dz || chart.getOption().dataZoom[0];
     //
@@ -2108,6 +2198,7 @@ const values = visible.map(d => d[1]).filter(v => v != null && v !== 0).concat(s
 
 
 
+// Moves the selected zoom range left or right.
 function moveZoomWindow(direction) {
 
     if (!isManualZoom) return;
@@ -2151,6 +2242,7 @@ function moveZoomWindow(direction) {
 /* ---------------------------------------
    ZOOM ALL CHARTS
 ---------------------------------------- */
+// Applies one zoom range across all visible charts.
 function zoomAllCharts(centerTs) {
 
     console.log("ts for zoom", centerTs)
@@ -2199,6 +2291,7 @@ const trimModeSelects = [
 ].filter(Boolean);
 
 // Helper to reflect a mode ("" = off, "automatic" = on) onto the switch
+// Updates the automatic/manual trim button states.
 function applyTrimButtonState(mode) {
     trimModeSelects.forEach(input => {
         input.dataset.mode = mode;
@@ -2209,6 +2302,15 @@ function applyTrimButtonState(mode) {
 trimModeSelects.forEach(input => {
     // input.addEventListener("change", () => {
         input.addEventListener("change", async () => {
+            if (input.checked && !(trimMap && trimMap.gaps.length)) {
+    await showModal({
+        message: "No significant gaps were detected in this session. Auto Trim was not performed.",       
+        yesText: "OK",
+        noText: null
+    });
+    input.checked = false;   // toggle back OFF
+    return;                  // nothing changed, so no DB write or reload
+}
         const wasDefault = isDefaultActive(); 
         const mode = input.checked ? "automatic" : "";
 
@@ -2258,6 +2360,7 @@ const filesDropdown = document.getElementById("filesDropdown");
 // Keeps the dropdown in sync when the code changes trim state itself.
 // on = true  -> default report is showing -> select "Raw"
 // on = false -> a trim was applied -> leave the dropdown as is
+// Shows or hides the restore-switch control.
 function setRestoreSwitch(on) {
     if (filesDropdown && on) filesDropdown.value = "raw";
 }
@@ -2293,11 +2396,13 @@ function showBusy(text) {
     el.style.display = "block";
     void el.offsetHeight;   // force paint before heavy work
 }
+// Hides the full-page loading overlay.
 function hideBusy() {
     const el = document.getElementById("restoreBusy");
     if (el) el.style.display = "none";
 }
 
+// Runs an asynchronous task while the loading overlay is visible.
 async function runWithLoader(text, task) {
     showBusy(text);
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -2308,6 +2413,7 @@ async function runWithLoader(text, task) {
     }
 }
 // Apply a saved file: its trims + its stored report (no writes to session_trim)
+// Loads and applies a saved report without changing session trim storage.
 async function loadSavedFileView(fileId) {
     if (!loadFileHandler) return;
     const f = await loadFileHandler(fileId);
@@ -2341,12 +2447,21 @@ export async function refreshFilesDropdown(selectId, apply = false) {
     if (!filesDropdown || !listFilesHandler) return;
     const files = await listFilesHandler();
     // const keep = selectId || filesDropdown.value || "raw";
-   const keep =
+//    const keep =
+//     selectId ||
+//     getSel() ||
+//     (files[0] && files[0].id) ||
+//     "raw"; //last saved file id or "raw" if no files exist
+//     "raw"; // last saved file last in dropdown or "raw" if no files exist
+
+const stored = getSel();
+const validStored = stored && stored !== "raw" && files.some(f => f.id === stored) ? stored : null;
+const keep =
     selectId ||
-    getSel() ||
-    (files[0] && files[0].id) ||
-    "raw"; //last saved file id or "raw" if no files exist
-    "raw"; // last saved file last in dropdown or "raw" if no files exist
+    validStored ||                      // ignore "raw" and ids from other sessions
+    (files[0] && files[0].id) ||        // latest saved file of this session
+    "raw";
+    // console.log("FILES:", files.map(f => f.id), "selectId:", selectId, "stored:", getSel(), "keep:", keep);
 
     filesDropdown.innerHTML = "";
     const raw = document.createElement("option");
@@ -2361,9 +2476,8 @@ export async function refreshFilesDropdown(selectId, apply = false) {
         filesDropdown.appendChild(o);
     });
     filesDropdown.value = [...filesDropdown.options].some(o => o.value === keep) ? keep : "raw";
-    filesDropdown.dataset.prev = filesDropdown.value;
-    // localStorage.setItem("lastTrimmedFileId", filesDropdown.value);
-    setSel(filesDropdown.value);  
+    filesDropdown.dataset.prev = filesDropdown.value; 
+    if (selectId) setSel(filesDropdown.value);   // remember only an explicit choice (e.g. just saved)
     refreshSaveBtn();   
     if (apply && filesDropdown.value !== "raw") {
         try {
@@ -2405,7 +2519,8 @@ filesDropdown?.addEventListener("change", async () => {
 // } else {
 //     localStorage.setItem("lastTrimmedFileId", selected);
 // }
-setSel(selected);
+// setSel(selected);
+if (selected === "raw") sessionStorage.removeItem(selKey()); else setSel(selected);
 // localStorage.setItem("lastTrimmedFileId", selected); 
     } catch (err) {
         console.error("Files dropdown failed:", err);
@@ -2499,6 +2614,7 @@ await refreshFilesDropdown(newId);
 // prevButtonrr.addEventListener("click", () => {
 //     moveZoomWindow("prev");
 // });
+// Moves through interval chunks or shifts the manual zoom range.
 function navigateChunkOrZoom(dir) {
     if (intervalActive && intervalSec && !isManualZoom) {
         showIntervalChunk(intervalIdx + (dir === "next" ? 1 : -1));
@@ -2519,6 +2635,7 @@ document.getElementById(id)?.addEventListener("click", () => navigateChunkOrZoom
 /* ---------------------------------------
    SHOW / HIDE RESET BUTTON
 ---------------------------------------- */
+// Shows or hides the reset-to-default button.
 function showResetButton(show) {
     // if (resetButtonVisible === show) return; // no operation if unchanged
     // resetButtonVisible = show;
@@ -2538,6 +2655,7 @@ function showResetButton(show) {
 }
 
 
+// Enables or disables report navigation controls.
 function updateNavigationButtons() {
 
     const prevButtonhr = document.getElementById("backBtnhr");
@@ -2634,6 +2752,7 @@ function updateNavigationButtons() {
 /* ---------------------------------------
    RESET ALL CHARTS
 ---------------------------------------- */
+// Clears zoom and resets all chart axes to their original state.
 function resetAllCharts() {
     const charts = getCharts();
     if (!charts.length) return;
@@ -2677,6 +2796,7 @@ function resetAllCharts() {
     });
 }
 
+// Displays or hides the no-data message for a chart container.
 function showNoData(domId) {
     const el = document.getElementById(domId);
 
@@ -2685,7 +2805,7 @@ function showNoData(domId) {
         return;
     }
 
-    const chart = echarts.getInstanceByDom(el);
+    let chart = echarts.getInstanceByDom(el);
 
     if (!chart) {
         chart = echarts.init(el);
