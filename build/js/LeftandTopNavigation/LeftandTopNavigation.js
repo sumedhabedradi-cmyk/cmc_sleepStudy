@@ -127,9 +127,18 @@ if (id) {
             ? `${hrs}h ${min}min`            // same source as the report
             : `${hours}h ${minutes}min`;  // fallback if the field is missing
         }
+        // to show latest session at last
+        // allSessions.push({
+        //   sessionId: key,
+        //   dateTime: completedDateTime,
+        //   duration: durationText,
+        //   duration1:durationText1
+        // });
 
+        //to show latest session first
         allSessions.push({
           sessionId: key,
+          timestamp: Number(session.spts) || 0,
           dateTime: completedDateTime,
           duration: durationText,
           duration1:durationText1
