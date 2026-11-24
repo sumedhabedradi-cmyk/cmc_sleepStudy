@@ -288,7 +288,7 @@ body .container.body .right_col {
 
 .x_panel.live-chart-panel #spo2_echart_content,
 .x_panel.live-chart-panel #heart_rate_echart_content,
-.x_panel.live-chart-panel #respiration_rate_echart_content
+.x_panel.live-chart-panel #respiration_rate_echart_content,
 .x_panel.live-chart-panel #resp_rate_echart_content {
   flex: 1 1 auto;
   width: 100%;
@@ -1541,3 +1541,132 @@ body.nav-sm #sidebar-menu .side-menu li a:hover {
     min-width: 0;
   }
 }
+
+
+/* Combined vitals card: grow to fit all four charts */
+.x_panel.live-chart-panel.combined-panel {
+  height: auto !important;
+  min-height: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}
+
+.combined-panel .combined-row {
+  display: block;
+  position: relative;
+  flex: none;
+  height: auto;
+  overflow: visible;
+}
+
+/* ID selectors + !important, so they also beat the rules in this file
+   (#heart_rate_echart_content { height: 100% } and the mobile 250px rule) */
+.combined-panel #heart_rate_echart_content,
+.combined-panel #spo2_echart_content,
+.combined-panel #respiration_rate_echart_content {
+  height: 170px !important;
+  min-height: 170px !important;
+  flex: none;
+}
+
+.combined-panel #resp_rate_echart_content {
+  height: 240px !important;   /* RR: X-axis labels + zoom slider */
+  min-height: 240px !important;
+  flex: none;
+}
+
+/* two clearly separated boxes: Interval and Hourly Windows */
+.tab-region {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;                          /* was 2px */
+  padding: 2px 10px 3px;           /* was 4px 12px 6px */
+  margin: 4px 0;                   /* was 8px 0 */
+  background: rgba(120, 144, 156, 0.14);
+  border: 1px solid rgba(94, 142, 173, 0.45);
+  /* border: 1px solid rgba(85, 129, 158, 0.45); */
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(29, 75, 102, 0.08);
+  transition: opacity .2s, background .2s;
+}
+
+.tab-region__title {
+  font-size: 11px;                 /* was 12px */
+  font-weight: 700;
+  line-height: 1.1;                /* was 1.2 */
+  color: #11384c; 
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  text-align: center;
+}
+
+.tab-region #intervalTabs,
+.tab-region #timeTabs {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;
+  gap: 4px;
+  row-gap: 4px;
+}
+
+/* slimmer tab buttons so the box gets shorter */
+.tab-region #intervalTabs button,
+.tab-region #timeTabs button {
+  padding: 3px 10px;               /* was 5px 10px */
+  line-height: 1.2;
+}
+
+/* disabled box: darker grey, still clickable to unlock */
+.tab-region.region-disabled {
+  opacity: 0.45;
+  background: rgba(120, 120, 120, 0.25);
+  cursor: pointer;
+}
+.tab-region.region-disabled * {
+  cursor: pointer;
+}
+
+
+.combined-row { position: relative; }
+
+.combined-label {
+  position: absolute;      /* was missing */
+  z-index: 2;              /* was missing */
+  pointer-events: none;    /* was missing, so the label doesn't block trim dragging */
+  top: 3px;
+  left: 62px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: .4px;
+  color: #bfefff;
+  background: rgba(79, 195, 217, 0.18);
+  border-left: 3px solid #4fc3d9;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+/* .combined-row:nth-child(1) .combined-label { border-left-color: #ff6b6b; color: #ffd0d0; background: rgba(255,107,107,.18); } 
+.combined-row:nth-child(2) .combined-label { border-left-color: #4fc3d9; color: #bfefff; background: rgba(79,195,217,.18); } 
+.combined-row:nth-child(3) .combined-label { border-left-color: #ffd166; color: #fff0c2; background: rgba(255,209,102,.18); }
+.combined-row:nth-child(4) .combined-label { border-left-color: #7bd88f; color: #d3f5dc; background: rgba(123,216,143,.18); } */
+
+.combined-row:nth-child(1) .combined-label,
+.combined-row:nth-child(2) .combined-label,
+.combined-row:nth-child(3) .combined-label,
+.combined-row:nth-child(4) .combined-label {
+    border-left-color: #4fc3d9;
+    color: #bfefff;
+    background: rgba(79, 195, 217, .18);
+}
+
+
+.combined-panel #heart_rate_echart_content, /* HR: */
+.combined-panel #spo2_echart_content   { height: 125px !important; min-height: 125px !important; flex: none; } /* SpO2: X-axis labels + zoom slider */
+
+.combined-panel #respiration_rate_echart_content { height: 90px !important; min-height: 90px !important; flex: none; } /* CI: X-axis labels + zoom slider */
+
+.combined-panel #resp_rate_echart_content { height: 140px !important; min-height: 140px !important; flex: none; } /* RR: X-axis labels + zoom slider */

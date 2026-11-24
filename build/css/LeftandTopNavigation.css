@@ -251,6 +251,13 @@
   font-weight: 300;
 }
 
+/* Session List */
+#SessionsList {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .profile.img_2 {
   text-align: center;
 }
@@ -2043,12 +2050,12 @@ span.right {
   height: calc(100dvh - 101px);
 }
 
-.restore-wrap > label:first-child {
+/* .restore-wrap > label:first-child {
   color: #0e0d0d;
   margin: 0;
   cursor: pointer;
   white-space: nowrap;
-}
+} */
 
 @media (max-width: 768px) {
   .restore-wrap > label:first-child { display: none; }
@@ -2057,3 +2064,98 @@ span.right {
 #SvasthyaTitle {
   font-family: ui-monospace;
 }
+
+/* Files dropdown: label sits on the box's top border */
+.files-box {
+  position: relative;
+  min-width: 220px;
+  margin-top: 6px;
+}
+
+.files-box__label {
+  position: absolute;
+  top: -5px;
+  left: 10px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: #5a6a7a;
+  background: #f3f5f7;   /* same as .restore-bar */
+  margin: 0;
+  z-index: 1;
+}
+
+.files-box__select {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: #2a3f54;
+  background: #fff;
+  border: 1px solid #8fa3b5;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.files-box__select:focus {
+  border-color: #1abb9c;
+  box-shadow: 0 0 0 2px rgba(26, 187, 156, 0.2);
+}
+
+/* Save button pinned to the right end of the Files bar */
+.save-file-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 30px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #1991c9;
+  border: 1px solid #1991c9;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save-file-btn:hover:not(:disabled) {
+  background: #157aa9;
+  border-color: #157aa9;
+}
+
+.save-file-btn:disabled {
+  background: #b8c0c8;
+  border-color: #b8c0c8;
+  color: #fff;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+/* small screens: icon only, so it doesn't collide with the dropdown */
+@media (max-width: 768px) {
+  .save-file-btn { right: 8px; padding: 0 10px; }
+  .save-file-btn span { display: none; }
+}
+
+.combined-row { position: relative; }
+
+.combined-label {
+  position: absolute;
+  top: 4px;
+  left: 60px;              /* matches the chart grid's left edge */
+  z-index: 2;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* !important because the old per-chart heights may be set in LiveRightColomn.css */
+.combined-panel .combined-chart { width: 100%; height: 170px !important; }
+.combined-panel .combined-chart--last { height: 240px !important; } /* room for X labels + slider */

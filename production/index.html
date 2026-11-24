@@ -135,7 +135,7 @@
       </div>
     </div>
   <!-- Restore default Report toggle-->
-<div class="restore-bar">
+<!-- <div class="restore-bar">
   <div class="trim-mode-wrap restore-wrap">
     <label for="defaultResetBtn" title="Reset to default (remove all trims)">Restore Default Report</label>
     <label class="trim-switch">
@@ -143,8 +143,30 @@
       <span class="trim-switch__slider"></span>
     </label>
   </div>
+</div> -->
+    <!-- Files dropdown -->
+<!-- <div class="restore-bar">
+  <div class="files-box">
+    <label for="filesDropdown" class="files-box__label">Files</label>
+    <select id="filesDropdown" class="files-box__select">
+      <option value="raw" selected>Raw</option>
+    </select>
+  </div>
+</div> -->
+<div class="restore-bar">
+  <div class="files-box">
+    <label for="filesDropdown" class="files-box__label">Files</label>
+    <select id="filesDropdown" class="files-box__select">
+      <option value="raw" selected>Raw Data</option>
+    </select>
+  </div>
+
+  <!-- Save button: top right, same line -->
+<button type="button" id="saveFileBtn" class="save-file-btn" title="Save the file" disabled>   
+  <i class="fa fa-save"></i> <span>Save</span>
+  </button>
 </div>
-    <div id="SessionDetails" class="right_col" role="main">
+<div id="SessionDetails" class="right_col" role="main">
       <div class="col-md-12 col-sm-12 col-xs-12 Graphcard">
         <!-- <div class="x_panel"> -->
         <div class="vitals-hero">
@@ -227,7 +249,27 @@
   </button> -->
 
 </div>
-            <div id="timeTabs"></div>
+
+<div class="tab-region" id="hourRegion">
+  <span class="tab-region__title"></span>
+  <div id="timeTabs"></div>
+</div>
+
+<div class="tab-region" id="intervalRegion">
+  <span class="tab-region__title"></span>
+  <div id="intervalTabs">
+    <button data-sec="120">2 Min</button>
+    <button data-sec="300">5 Min</button>
+    <button data-sec="600">10 Min</button>
+    <button data-sec="1800">30 Min</button>
+    <button data-sec="3600">1 Hour</button>
+    <button data-sec="7200">2 Hours</button>
+    <!-- <button data-sec="0">All</button> -->
+  </div>
+</div>
+
+
+            <!-- <div id="timeTabs"></div> -->
             <!-- Trim -->
               <!-- <div class="trim-mode-wrap" id="globalTrimWrap">
   <label for="trimModeGlobal">Trim:</label>
@@ -255,66 +297,43 @@
                       <button id="nextBtnhr" class="nav-btn">Next ▶</button>
                   </div>
                 </article> -->
-                <article class="live-wave-card">
+            <article class="live-wave-card">
   <div class="live-wave-card__header">
-    <div>
-      <h2>Heart Rate (HR)</h2>
+    <div><h2>Vitals</h2></div>
+  </div>
+
+  <div class="x_panel live-chart-panel combined-panel">
+    <div class="combined-row">
+      <span class="combined-label">Heart Rate (HR)</span>
+      <div id="heart_rate_echart_content" class="combined-chart"></div>
+    </div>
+    <div class="combined-row">
+      <span class="combined-label">Blood Oxygen (SpO2)</span>
+      <div id="spo2_echart_content" class="combined-chart"></div>
+    </div>
+    <div class="combined-row" id="ciCard">
+      <span class="combined-label">Chest Impedance</span>
+      <div id="respiration_rate_echart_content" class="combined-chart"></div>
+    </div>
+    <div class="combined-row">
+      <span class="combined-label">Respiration Rate</span>
+      <div id="resp_rate_echart_content" class="combined-chart combined-chart--last"></div>
     </div>
   </div>
-  <div class="x_panel live-chart-panel">
-    <div id="heart_rate_echart_content"></div>
-  </div>
+
+  <!-- one common Back/Next -->
   <div class="chart-nav">
-      <button id="backBtnhr" class="nav-btn">◀ Back</button>
-      <button id="nextBtnhr" class="nav-btn">Next ▶</button>
+    <button id="backBtnhr" class="nav-btn">◀ Back</button>
+    <button id="nextBtnhr" class="nav-btn">Next ▶</button>
+  </div>
+
+  <!-- kept hidden so updateNavigationButtons() and the click wiring still find their ids -->
+  <div hidden>
+    <button id="backBtnspo2"></button><button id="nextBtnspo2"></button>
+    <button id="backBtnci"></button><button id="nextBtnci"></button>
+    <button id="backBtnrr"></button><button id="nextBtnrr"></button>
   </div>
 </article>
-                
-                <article class="live-wave-card">
-                  <div class="live-wave-card__header">
-                    <div>
-                      <h2>Blood Oxygen (SPO2)</h2>
-                    </div>  
-                  </div>
-                  <div class="x_panel live-chart-panel">
-                    <div id="spo2_echart_content"></div>
-                  </div>
-                  <div class="chart-nav">
-                      <button id="backBtnspo2" class="nav-btn">◀ Back</button>
-                      <button id="nextBtnspo2" class="nav-btn">Next ▶</button>
-                  </div>
-                </article>
-
-                <!-- <article class="live-wave-card"> -->
-                  <article class="live-wave-card" id="ciCard">
-                  <div class="live-wave-card__header">
-                    <div>
-                      <h2>Chest Impedance </h2>
-                    </div>
-                  </div>
-                  <div class="x_panel live-chart-panel">
-                    <div id="respiration_rate_echart_content"></div>
-                  </div>
-                  <div class="chart-nav">
-                      <button id="backBtnci" class="nav-btn">◀ Back</button>
-                      <button id="nextBtnci" class="nav-btn">Next ▶</button>
-                  </div>
-                </article>
-
-                 <article class="live-wave-card">
-                  <div class="live-wave-card__header">
-                    <div>
-                      <h2>Respiration Rate </h2>
-                    </div>
-                  </div>
-                  <div class="x_panel live-chart-panel">
-                    <div id="resp_rate_echart_content"></div>
-                  </div>
-                  <div class="chart-nav">
-                      <button id="backBtnrr" class="nav-btn">◀ Back</button>
-                      <button id="nextBtnrr" class="nav-btn">Next ▶</button>
-                  </div>
-                </article>
               </section>
        
         
@@ -549,7 +568,7 @@
       </script>
 
       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-      <div class="version-badge">Version 0.7.5</div>
+      <div class="version-badge">Version 0.8.1</div>
 </body>
 <script>
   (function () {

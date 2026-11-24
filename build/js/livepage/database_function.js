@@ -2,7 +2,10 @@ import { createVitalChart } from "./live-custom.js";
 import { fb } from "../firebase/config.js";
 import { NoEcgData, NoData, NoPpgData, NoRRData } from "./EchartGraphs.js";
 import { installGlobalEchartsAutoResize } from "../utils/echarts-auto-resize.js";
-import { showNoData,createTimeWindows ,createWindowTabs ,setManualTrimSaveHandler, setAutoTrimSaveHandler, setTrimRestoreHandler, setTrimChangeHandler } from "./live-custom.js";
+// import { showNoData,createTimeWindows ,createWindowTabs ,setManualTrimSaveHandler, setAutoTrimSaveHandler, setTrimRestoreHandler, setTrimChangeHandler } from "./live-custom.js";
+import { showNoData, createTimeWindows, createWindowTabs, setManualTrimSaveHandler,
+         setAutoTrimSaveHandler, setTrimRestoreHandler, setTrimChangeHandler,
+         setFileHandlers, refreshFilesDropdown } from "./live-custom.js";
 installGlobalEchartsAutoResize();
 
 // [{start,end}] (ms), "s1,e1,s2,e2" (seconds)
@@ -226,6 +229,206 @@ async function loadLatestTrim() {
 
 setTrimRestoreHandler(loadLatestTrim);
 
+// ---------- Saved files (svdby) ----------
+let latestAnalysis = null;   // last report painted
+
+// TODO: point this at wherever you store the logged-in doctor's name
+function getDoctorName() {
+    return localStorage.getItem("docname") || "Unknown";
+}
+
+// svdby/{patientId}/{sessionTimestamp}/{fileId}
+// function getSavedFilesRef() {
+//     return fb.database().ref().child("svdby").child(id).child(timestamp);
+// }
+
+// async function saveCurrentAnalysis(fileName) {
+//     if (waiting) throw new Error("REPORT_PENDING");
+//     if (!latestAnalysis) throw new Error("NO_REPORT");
+//     const base = getTrimBaseRef();
+//     if (!base) throw new Error("NO_SESSION");
+
+//     const [trimSnap, sessSnap] = await Promise.all([
+//         base.once("value"),
+//         fb.database().ref().child("session").child(id).child(timestamp).once("value")
+//     ]);
+//     const trim = trimSnap.val() || {};
+
+//     const record = {
+//         file_name: fileName,
+//         doctor_name: getDoctorName(),
+//         doctor_id: localStorage.getItem("doc_registerId") || null,
+//         saved_ts: Math.floor(Date.now() / 1000),
+//         session: sessSnap.val() || {},
+//         session_analysis: latestAnalysis,
+//         auto_trim_ts: (trim.auto_trim && trim.auto_trim.spo) || null,
+//         manual_trim_ts: trim.manual_trim || null
+//     };
+//     const ref = getSavedFilesRef().push();
+//     await ref.set(record);
+//     return ref.key;
+// }
+
+// async function listSavedFiles() {
+//     const snap = await getSavedFilesRef().once("value");
+//     const out = [];
+//     snap.forEach(c => {
+//         const v = c.val() || {};
+//         out.push({ id: c.key, file_name: v.file_name, doctor_name: v.doctor_name, saved_ts: v.saved_ts || 0 });
+//     });
+//     return out.sort((a, b) => b.saved_ts - a.saved_ts);
+// }
+
+// async function loadSavedFile(fileId) {
+//     const v = (await getSavedFilesRef().child(fileId).once("value")).val();
+//     if (!v) return null;
+//     const manual = {};
+//     Object.entries(v.manual_trim_ts || {}).forEach(([k, r]) => { manual[k] = parseRanges(r); });
+//     return { trim: { hasAuto: !!v.auto_trim_ts, manual }, analysis: v.session_analysis || null };
+// }
+
+// ---------- Saved files: svdby/{uid}/{report name}/{session timestamp} ----------
+const safeKey = n => String(n).trim().replace(/[.$#\[\]\/]/g, "_");
+
+function getReportsRoot() {
+    return fb.database().ref().child("svdby").child(id);
+}
+
+// fields copied from the session node, then from session_analysis
+const SESSION_FIELDS = ["stts", "spts", "status", "report_url", "dvrf"];
+const ANALYSIS_FIELDS = [
+    "signal_quality", "study_adequacy", "total_duration_min", "mean_SpO2", "baseline_SpO2",
+    "min_SpO2_nadir", "max_SpO2", "ODI3_total", "ODI3_per_hour", "ODI4_total", "ODI4_per_hour",
+    "time_below_95_min", "time_below_90_min", "time_below_85_min", "time_below_80_min",
+    "time_below_70_min", "time_below_60_min",
+    "time_90_95_min", "time_80_90_min", "time_70_80_min", "time_60_70_min",
+    "longest_desat_94_min", "longest_desat_90_min", "longest_desat_80_min",
+    "artifact_free_duration_min", "highest_RR", "highest_HR", "odi3time", "odi4time",
+    "rpt_gen_ts", "total_desat_events", "window_end", "window_start",
+    "baseline_HR", "mean_HR", "lowest_HR", "baseline_RR", "mean_RR", "lowest_RR", "window_used"
+];
+
+// async function saveCurrentAnalysis(fileName) {
+//     if (waiting) throw new Error("REPORT_PENDING");
+//     if (!latestAnalysis) throw new Error("NO_REPORT");
+//     const base = getTrimBaseRef();
+//     if (!base) throw new Error("NO_SESSION");
+
+//     const key = safeKey(fileName);
+//     const ref = getReportsRoot().child(key).child(timestamp);
+
+//     if ((await ref.once("value")).exists()) throw new Error("NAME_EXISTS");
+
+//     const [trimSnap, sessSnap] = await Promise.all([
+//         base.once("value"),
+//         fb.database().ref().child("session").child(id).child(timestamp).once("value")
+//     ]);
+//     const trim = trimSnap.val() || {};
+//     const s = sessSnap.val() || {};
+
+//     const record = {};
+//     SESSION_FIELDS.forEach(k => { record[k] = s[k] !== undefined ? s[k] : null; });
+//     ANALYSIS_FIELDS.forEach(k => { record[k] = latestAnalysis[k] !== undefined ? latestAnalysis[k] : null; });
+//     record.rsvdby = getDoctorName();
+//     record.auto_trim = trim.auto_trim || null;       // { spo: [s1,e1,...] } same as session_trim
+//     record.manual_trim = trim.manual_trim || null;   // { hr:[...], spo:[...], ci:[...], rr:[...] }
+
+//     await ref.set(record);
+//     return key;
+// }
+async function saveCurrentAnalysis(fileName) {
+    if (waiting) throw new Error("REPORT_PENDING");
+    if (!latestAnalysis) throw new Error("NO_REPORT");
+    const base = getTrimBaseRef();
+    if (!base) throw new Error("NO_SESSION");
+
+    const key = safeKey(fileName);
+    const ref = getReportsRoot().child(key).child(timestamp);
+    if ((await ref.once("value")).exists()) throw new Error("NAME_EXISTS");
+
+    // const [trimSnap, sessSnap] = await Promise.all([
+    //     base.once("value"),
+    //     fb.database().ref().child("session").child(id).child(timestamp).once("value")
+    // ]);
+   const docId = localStorage.getItem("doc_registerId");
+const root = fb.database().ref();
+
+const [trimSnap, sA, sB, dS] = await Promise.all([
+    base.once("value"),
+    root.child("session").child(id).child(docId).child(timestamp).once("value"), // session/{id}/{docId}/{ts}
+    root.child("session").child(id).child(timestamp).once("value"),              // session/{id}/{ts}
+    root.child("d_session").child(id).child(timestamp).once("value")             // default fallback
+]);
+const trim = trimSnap.val() || {};
+
+// the session node wins; d_session only fills fields the session node doesn't have
+const sessionNode = sA.exists() ? sA.val() : (sB.exists() ? sB.val() : {});
+const s = { ...(dS.val() || {}), ...sessionNode };
+console.log("SAVE: session source =", sA.exists() ? "session/id/docId/ts" : sB.exists() ? "session/id/ts" : "d_session only", s);
+
+    // const trim = trimSnap.val() || {};
+    // const s = sessSnap.val() || {};
+
+    const record = {};
+    SESSION_FIELDS.forEach(k => { record[k] = s[k] !== undefined ? s[k] : null; });
+    ANALYSIS_FIELDS.forEach(k => { record[k] = latestAnalysis[k] !== undefined ? latestAnalysis[k] : null; });
+    record.file_name = fileName;
+    record.saved_ts = Math.floor(Date.now() / 1000);
+    record.rsvdby = getDoctorName();
+    record.auto_trim = trim.auto_trim || null;
+    record.manual_trim = trim.manual_trim || null;
+
+    await ref.set(record);
+    return key;
+}
+
+async function listSavedFiles() {
+    const snap = await getReportsRoot().once("value");
+    const out = [];
+    snap.forEach(nameSnap => {
+        if (!nameSnap.hasChild(timestamp)) return;      // saved for another session
+        const v = nameSnap.child(timestamp).val() || {};
+        out.push({
+            id: nameSnap.key,
+            file_name: v.file_name || nameSnap.key,
+            doctor_name: v.rsvdby,
+            saved_ts: v.saved_ts || 0
+        });
+    });
+    return out.sort((a, b) => b.saved_ts - a.saved_ts);
+}
+
+async function loadSavedFile(fileId) {
+    const v = (await getReportsRoot().child(fileId).child(timestamp).once("value")).val();
+    if (!v) return null;
+
+    const manual = {};
+    Object.entries(v.manual_trim || {}).forEach(([k, r]) => { manual[k] = parseRanges(r); });
+
+    return {
+        trim: {
+            hasAuto: !!v.auto_trim,
+            autoGaps: v.auto_trim && v.auto_trim.spo ? parseRanges(v.auto_trim.spo) : [],
+            manual
+        },
+        analysis: v      // flat record; paintFn reads rpt_gen_ts, mean_SpO2, etc. directly from svdby
+    };
+}
+// function paintSavedAnalysis(analysis) {
+//     if (analysisRef) { analysisRef.off(); analysisRef = null; }
+//     stopWaiting();
+//     if (analysis && paintFn) paintFn(analysis);
+// }
+
+function paintSavedAnalysis(analysis) {
+    if (analysisRef) { analysisRef.off(); analysisRef = null; }
+    stopWaiting();
+    latestAnalysis = analysis || null;   // add this
+    if (analysis && paintFn) paintFn(analysis);
+}
+
+setFileHandlers({ save: saveCurrentAnalysis, list: listSavedFiles, load: loadSavedFile, paint: paintSavedAnalysis });
+
 let id = "";
 let timestamp = "";
 function init_echarts() {
@@ -315,6 +518,7 @@ function renderAnalysis(useTrim, waitForUpdate = false) {
   const firstSnapPromise = new Promise(r => { firstSnap = r; });
   analysisRef.on("value", snap => {
     const val = snap.exists() ? snap.val() : null;
+    latestAnalysis = val;
     // if (val && paintFn) paintFn(val);
     //to show linked details to perticular session instead of showing same data to all sessions
     if (val && paintFn) {
@@ -499,7 +703,25 @@ async function getAllParameters(ts) {    //to show linked details to perticular 
   };
 renderAnalysis(initialTrimActive);
 
+// refreshFilesDropdown();
+await refreshFilesDropdown(undefined, true);
+
 }
+
+function decodevalues(data) {
+    const values = String(data).trim().split(/\s+/).map(Number);
+    let group = "";
+    for (let i = 0; i < values.length; i += 5) {
+        let current = values[i];
+        group = group + (current + " ");
+        for (let j = 1; j < 5 && i + j < values.length; j++) {
+            current += values[i + j];
+            group = group + (current + " ");
+        }
+    }
+    return group;
+}
+
 async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestamp, completedtimestamp) {
 
  
@@ -597,41 +819,81 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
               // =========================
               let rrdata = [];
 
+              // if (rrSnap.exists()) {
+              //   rrSnap.forEach((child) => {
+              //     const value = child.val();
+              //     const timestamp = Number(value?.timestamp);
+
+              //     if (!value?.values) return;
+
+              //     const matches = value.values.match(/\[([^\]]+)\]/g);
+              //     if (!matches) return;
+
+              //     const rrArray = matches
+              //       .map(group =>
+              //         group
+              //           .replace(/\[|\]/g, "")
+              //           .split(",")
+              //           .map(v => Number(v.trim()))
+              //       )
+              //       .flat();
+
+              //     const interval = 40; // adjust if needed (1 sec, 2 sec, etc.), for CI every 40ms one point is coming
+              //     const base = timestamp *1000
+              //     rrArray.forEach((rr, i) => {
+              //       rrdata.push([
+              //         base + i * interval,
+              //         rr
+              //       ]);
+              //     });
+              //   });
+              // }
               if (rrSnap.exists()) {
-                rrSnap.forEach((child) => {
-                  const value = child.val();
-                  const timestamp = Number(value?.timestamp);
+  rrSnap.forEach((child) => {
+    const value = child.val();
 
-                  if (!value?.values) return;
+    // old format: { timestamp, values: "[a, b][c, d]" }
+    // new format: { ts, resp: "a b c d" }
+    const timestamp = Number(value?.timestamp ?? value?.ts);
+    const raw = value?.values ?? value?.resp;
+    if (!raw) return;
 
-                  const matches = value.values.match(/\[([^\]]+)\]/g);
-                  if (!matches) return;
+    let rrArray;
+    const matches = String(raw).match(/\[([^\]]+)\]/g);
 
-                  const rrArray = matches
-                    .map(group =>
-                      group
-                        .replace(/\[|\]/g, "")
-                        .split(",")
-                        .map(v => Number(v.trim()))
-                    )
-                    .flat();
+    if (matches) {
+      // old format (unchanged logic)
+      rrArray = matches
+        .map(group =>
+          group
+            .replace(/\[|\]/g, "")
+            .split(",")
+            .map(v => Number(v.trim()))
+        )
+        .flat();
+    } else {
+      // new format: delta-encoded, decode first
+      rrArray = decodevalues(raw)
+        .trim()
+        .split(/\s+/)
+        .map(Number)
+        .filter(Number.isFinite);
+    }
 
-                  const interval = 40; // adjust if needed (1 sec, 2 sec, etc.), for CI every 40ms one point is coming
-                  const base = timestamp *1000
-                  rrArray.forEach((rr, i) => {
-                    rrdata.push([
-                      base + i * interval,
-                      rr
-                    ]);
-                  });
-                });
-              }
+    const interval = 40; // unchanged
+    const base = timestamp * 1000;
+    rrArray.forEach((rr, i) => {
+      rrdata.push([base + i * interval, rr]);
+    });
+  });
+}
 
               console.log("RR DATA FINAL:", rrdata);
               let windows  = createTimeWindows((completedtimestamp-starttimestamp),starttimestamp,completedtimestamp)
               // createWindowTabs(windows,hrdata,spo2data,rrdata,rrdata1,odi3data,odi4data);
               const savedTrim = await loadSavedTrim();
-              initialTrimActive = trimActive(savedTrim);  
+              // initialTrimActive = trimActive(savedTrim);  
+              initialTrimActive = false;
               createWindowTabs(windows, hrdata, spo2data, rrdata, rrdata1, odi3data, odi4data, savedTrim);
              
             }
