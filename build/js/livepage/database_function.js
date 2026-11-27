@@ -376,7 +376,7 @@ const trim = trimSnap.val() || {};
 // the session node wins; d_session only fills fields the session node doesn't have
 const sessionNode = sA.exists() ? sA.val() : (sB.exists() ? sB.val() : {});
 const s = { ...(dS.val() || {}), ...sessionNode };
-console.log("SAVE: session source =", sA.exists() ? "session/id/docId/ts" : sB.exists() ? "session/id/ts" : "d_session only", s);
+// console.log("SAVE: session source =", sA.exists() ? "session/id/docId/ts" : sB.exists() ? "session/id/ts" : "d_session only", s);
 
     // const trim = trimSnap.val() || {};
     // const s = sessSnap.val() || {};
@@ -609,6 +609,10 @@ async function getAllParameters(ts) {    //to show linked details to perticular 
   completedTime = new Date(completedtimestamp * 1000);
   startTime = new Date(starttimestamp * 1000);
 
+// console.log("***********************************************");
+// console.log("START TIME:", starttimestamp);
+// console.log("END TIME:",completedtimestamp);
+// console.log("***********************************************");
 
   let duration = completedtimestamp - starttimestamp
   
@@ -628,7 +632,12 @@ async function getAllParameters(ts) {    //to show linked details to perticular 
   loader.style.display = "none";
 
 
-
+// console.log("_________________________________________________");
+// console.log("START DATE:",startTime);
+// console.log("END Date:",completedtime);
+// console.log("START DATE:",startdate);
+// console.log("COMPLETED DATE:", completeddate);
+// console.log("___________________________________________________");
 
   // const oxySnap = await oxyhrparams.once("value");
   // if (oxySnap.exists()) {
@@ -768,11 +777,20 @@ async function loadSpo2Data(spo2_chart, rr_chart,sessionanalysis1, starttimestam
               // =========================
               // ❌ No SPO2 data
               // =========================
+              // if (!spo2Snap.exists()) {
+              //   console.log("No SPO2 data found");
+              //   showNoData("heart_rate_echart_content");
+              //   showNoData("spo2_echart_content");
+              //   showNoData("respiration_rate_echart_content"); 
+              //   showNoData("resp_rate_echart_content")
+              //   return;
+              // }
               if (!spo2Snap.exists()) {
                 console.log("No SPO2 data found");
-                showNoData("heart_rate_echart_content");
-                showNoData("spo2_echart_content");
-                showNoData("resp_rate_echart_content")
+              // build tabs with EMPTY data: every hour/interval click shows "No Data Available"
+                const emptyWindows = createTimeWindows((completedtimestamp - starttimestamp), starttimestamp, completedtimestamp);
+                initialTrimActive = false;
+                createWindowTabs(emptyWindows, [], [], [], [], [], [], null);
                 return;
               }
 

@@ -49,6 +49,8 @@ let effectiveTrimMap = null;
 });
 
 window.getEffectiveTrimMap = () => effectiveTrimMap;
+let lastMouseX = 0;
+document.addEventListener("mousemove", e => { lastMouseX = e.clientX; }, true);
 
 // manual trim 
 let savedAutoGaps = null;   // auto-trim gaps loaded from an svdby file
@@ -1646,17 +1648,30 @@ function createVitalChart({
         //     : null,
         tooltip: {
             trigger: "axis",
-            appendToBody: true,                          // new: not clipped by the chart or covered by other rows
-            extraCssText: "z-index:99999;",   
+            appendToBody: true,           
+            extraCssText: "z-index:99999;", 
             axisPointer: {
                 type: "cross"
             },
+
+            // every card uses the real cursor x, so all four line up
+            position: function (point, params, dom, rect, size) {
+                const GAP = 15;
+                const w = size.contentSize[0];
+                const chartLeft = chart.getDom().getBoundingClientRect().left;
+                let x = lastMouseX - chartLeft + GAP;
+                if (lastMouseX + GAP + w > window.innerWidth) x = lastMouseX - chartLeft - GAP - w;
+                return [x, 4];
+            },
             formatter: function (params) {
+                // hidden chart (CI in "All") -> no card
+                if (!chart.getDom().offsetParent) return "";
                 // Remove scatter series from tooltip
                 // const filtered = params.filter(item => item.seriesType !== "scatter");
-                 const filtered = params.filter(
-        item => item.seriesType !== "scatter" && item.value
-    );
+                const filtered = params.filter(
+                    // item => item.seriesType !== "scatter" && item.value
+                    item => item.seriesType !== "scatter"
+                );
 
                 if (!filtered.length) {
                     return "";
@@ -1905,11 +1920,24 @@ function createVitalChart({
     });
     chart.off("dataZoom");
     chart.off("click");
+    // show the tooltip on every other visible chart (CI is skipped in "All")
+chart.getZr().on("mousemove", e => {
+    if (trimStart) return;                               // not while dragging a trim box
+    getTrimCharts().forEach(c => {
+        if (c === chart) return;
+        const g = c.getModel().getComponent("grid", 0).coordinateSystem.getRect();
+        c.dispatchAction({ type: "showTip", x: e.offsetX, y: g.y + g.height / 2 });
+    });
+});
+chart.getZr().on("globalout", () => {
+    getCharts().forEach(c => c.dispatchAction({ type: "hideTip" }));
+});
 
     // ================================
     // MANUAL TRIM PORTION SELECT BOX
     // ================================
     chart.getZr().on("mousedown", function (e) {
+        if (!chart.__rawData || chart.__rawData.length === 0) return;   // no data -> no manual trim option
         const sliderModel = chart.getModel().getComponent("dataZoom", 1);
 
         if (sliderModel) {
